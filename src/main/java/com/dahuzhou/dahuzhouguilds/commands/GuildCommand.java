@@ -93,7 +93,7 @@ import net.minecraft.server.MinecraftServer;
 
 public class GuildCommand {
     public static void register(CommandDispatcher<ServerCommandSource> dispatcher) {
-        dispatcher.register((LiteralArgumentBuilder)((LiteralArgumentBuilder)((LiteralArgumentBuilder)((LiteralArgumentBuilder)((LiteralArgumentBuilder)((LiteralArgumentBuilder)((LiteralArgumentBuilder)((LiteralArgumentBuilder)((LiteralArgumentBuilder)((LiteralArgumentBuilder)((LiteralArgumentBuilder)((LiteralArgumentBuilder)((LiteralArgumentBuilder)((LiteralArgumentBuilder)((LiteralArgumentBuilder)((LiteralArgumentBuilder)((LiteralArgumentBuilder)((LiteralArgumentBuilder)((LiteralArgumentBuilder)((LiteralArgumentBuilder)((LiteralArgumentBuilder)((LiteralArgumentBuilder)((LiteralArgumentBuilder)((LiteralArgumentBuilder)((LiteralArgumentBuilder)((LiteralArgumentBuilder)CommandManager.literal((String)"guild").then(CommandManager.literal((String)"create").then(CommandManager.argument((String)"name", (ArgumentType)StringArgumentType.word()).then(CommandManager.argument((String)"color", (ArgumentType)StringArgumentType.word()).executes(ctx -> {
+        dispatcher.register((LiteralArgumentBuilder)((LiteralArgumentBuilder)((LiteralArgumentBuilder)((LiteralArgumentBuilder)((LiteralArgumentBuilder)((LiteralArgumentBuilder)((LiteralArgumentBuilder)((LiteralArgumentBuilder)((LiteralArgumentBuilder)((LiteralArgumentBuilder)((LiteralArgumentBuilder)((LiteralArgumentBuilder)((LiteralArgumentBuilder)((LiteralArgumentBuilder)((LiteralArgumentBuilder)((LiteralArgumentBuilder)((LiteralArgumentBuilder)((LiteralArgumentBuilder)((LiteralArgumentBuilder)((LiteralArgumentBuilder)((LiteralArgumentBuilder)((LiteralArgumentBuilder)((LiteralArgumentBuilder)((LiteralArgumentBuilder)((LiteralArgumentBuilder)((LiteralArgumentBuilder)CommandManager.literal((String)"guild").then(CommandManager.literal((String)"create").then(CommandManager.argument((String)"name", (ArgumentType)StringArgumentType.string()).then(CommandManager.argument((String)"color", (ArgumentType)StringArgumentType.word()).executes(ctx -> {
             Formatting color;
             ServerCommandSource source = (ServerCommandSource)ctx.getSource();
             ServerPlayerEntity player = source.getPlayer();
@@ -161,7 +161,7 @@ public class GuildCommand {
             }
             GuildCommand.displayGuildInfo(source.getServer(), source, guild);
             return 1;
-        })).then(CommandManager.argument((String)"name", (ArgumentType)StringArgumentType.word()).executes(ctx -> {
+        })).then(CommandManager.argument((String)"name", (ArgumentType)StringArgumentType.string()).executes(ctx -> {
             ServerPlayerEntity player;
             ServerCommandSource source = (ServerCommandSource)ctx.getSource();
             String name = StringArgumentType.getString((CommandContext)ctx, (String)"name");
@@ -614,7 +614,7 @@ public class GuildCommand {
             GuildDataManager.saveGuild(source.getServer(), guild);
             source.sendFeedback(() -> GuildTexts.t("motd.updated_prefix").append(Text.literal(motd).styled(style -> style.withColor(Formatting.YELLOW))), false);
             return 1;
-        })))).then(CommandManager.literal((String)"rename").then(CommandManager.argument((String)"name", (ArgumentType)StringArgumentType.word()).then(CommandManager.argument((String)"color", (ArgumentType)StringArgumentType.word()).executes(ctx -> {
+        })))).then(CommandManager.literal((String)"rename").then(CommandManager.argument((String)"name", (ArgumentType)StringArgumentType.string()).then(CommandManager.argument((String)"color", (ArgumentType)StringArgumentType.word()).executes(ctx -> {
             Formatting color;
             ServerCommandSource source = (ServerCommandSource)ctx.getSource();
             ServerPlayerEntity player = source.getPlayer();
