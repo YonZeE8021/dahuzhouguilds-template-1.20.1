@@ -1,0 +1,20 @@
+{
+  "mappings": {
+    "net/demoniconpc/guildsremasteredmod/mixin/AllyChatManagerMixin": {
+      "handleDecoratedMessage": "Lnet/minecraft/class_3244;method_44155(Lnet/minecraft/class_7471;)V"
+    },
+    "net/demoniconpc/guildsremasteredmod/mixin/GuildChatManagerMixin": {
+      "handleDecoratedMessage": "Lnet/minecraft/class_3244;method_44155(Lnet/minecraft/class_7471;)V"
+    }
+  },
+  "data": {
+    "named:intermediary": {
+      "net/demoniconpc/guildsremasteredmod/mixin/AllyChatManagerMixin": {
+        "handleDecoratedMessage": "Lnet/minecraft/class_3244;method_44155(Lnet/minecraft/class_7471;)V"
+      },
+      "net/demoniconpc/guildsremasteredmod/mixin/GuildChatManagerMixin": {
+        "handleDecoratedMessage": "Lnet/minecraft/class_3244;method_44155(Lnet/minecraft/class_7471;)V"
+      }
+    }
+  }
+}
