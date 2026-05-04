@@ -15,6 +15,7 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.UUID;
+import com.dahuzhou.dahuzhouguilds.GuildTexts;
 import com.dahuzhou.dahuzhouguilds.GuildsConfig;
 import net.minecraft.util.Formatting;
 import net.minecraft.entity.damage.DamageSource;
@@ -44,13 +45,13 @@ public class DelayedTeleportScheduler {
             ServerPlayerEntity player = server.getPlayerManager().getPlayer(entry.getKey());
             if (player == null || !player.isAlive()) {
                 if (player != null) {
-                    player.sendMessage((Text)Text.literal((String)"Teleport cancelled: You died.").formatted(Formatting.RED), false);
+                    player.sendMessage(GuildTexts.t("teleport.cancel.death").formatted(Formatting.RED), false);
                 }
                 iterator.remove();
                 continue;
             }
             if (GuildsConfig.cancelTeleportOnMove && !player.getPos().equals((Object)task.initialPos)) {
-                player.sendMessage((Text)Text.literal((String)"Teleport cancelled: You moved.").formatted(Formatting.RED), false);
+                player.sendMessage(GuildTexts.t("teleport.cancel.move").formatted(Formatting.RED), false);
                 iterator.remove();
                 continue;
             }
@@ -67,7 +68,7 @@ public class DelayedTeleportScheduler {
         }
         TeleportTask task = activeTeleports.remove(player.getUuid());
         if (task != null) {
-            player.sendMessage((Text)Text.literal((String)"Teleport cancelled: You took damage.").formatted(Formatting.RED), false);
+            player.sendMessage(GuildTexts.t("teleport.cancel.damage").formatted(Formatting.RED), false);
         }
     }
 

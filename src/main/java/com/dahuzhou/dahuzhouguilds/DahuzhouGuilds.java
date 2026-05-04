@@ -1,5 +1,6 @@
 package com.dahuzhou.dahuzhouguilds;
 
+import com.dahuzhou.dahuzhouguilds.GuildTexts;
 import com.dahuzhou.dahuzhouguilds.commands.AllyCommand;
 import com.dahuzhou.dahuzhouguilds.commands.GuildCommand;
 import com.dahuzhou.dahuzhouguilds.data.GuildBankManager;
@@ -50,7 +51,7 @@ public class DahuzhouGuilds implements ModInitializer {
 				String motd = guild.getMotd();
 				if (motd != null && !motd.isEmpty()) {
 					player.sendMessage(
-							Text.literal("[Guild MOTD] ").append(Text.literal(motd).styled(style -> style.withColor(Formatting.YELLOW))),
+							GuildTexts.t("join.guild_motd_broadcast_prefix").append(Text.literal(motd).styled(style -> style.withColor(Formatting.YELLOW))),
 							false);
 				}
 				String teamName = "guild_" + guild.getId().toString().substring(0, 8);

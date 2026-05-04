@@ -51,6 +51,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
+import com.dahuzhou.dahuzhouguilds.GuildTexts;
 import com.dahuzhou.dahuzhouguilds.GuildsConfig;
 import com.dahuzhou.dahuzhouguilds.data.GuildBankManager;
 import com.dahuzhou.dahuzhouguilds.data.GuildDataManager;
@@ -59,7 +60,9 @@ import com.dahuzhou.dahuzhouguilds.util.AllyChatBridgeManager;
 import com.dahuzhou.dahuzhouguilds.util.DelayedTeleportScheduler;
 import com.dahuzhou.dahuzhouguilds.util.GuildBankInventory;
 import com.dahuzhou.dahuzhouguilds.util.GuildBankScreenHandler;
+import com.dahuzhou.dahuzhouguilds.util.GuildDisplayUtil;
 import com.dahuzhou.dahuzhouguilds.util.GuildColorUtil;
+import com.dahuzhou.dahuzhouguilds.util.GuildNameUtil;
 import com.dahuzhou.dahuzhouguilds.util.GuildHungerBoundPrefixHelper;
 import com.dahuzhou.dahuzhouguilds.util.GuildPermissionsMenu;
 import com.dahuzhou.dahuzhouguilds.util.GuildPrefixHelper;
@@ -95,30 +98,30 @@ public class GuildCommand {
             ServerCommandSource source = (ServerCommandSource)ctx.getSource();
             ServerPlayerEntity player = source.getPlayer();
             String name = StringArgumentType.getString((CommandContext)ctx, (String)"name");
-            if (name.length() > 13) {
-                source.sendError((Text)Text.literal((String)"The guild name must be 13 characters or fewer."));
+            if (!GuildNameUtil.isWithinMaxLength(name)) {
+                source.sendError(GuildTexts.t("error.guild_name_too_long", GuildNameUtil.MAX_GUILD_NAME_CODE_POINTS));
                 return 0;
             }
             String colorName = StringArgumentType.getString((CommandContext)ctx, (String)"color").toUpperCase();
             try {
                 color = Formatting.valueOf((String)colorName);
                 if (!color.isColor()) {
-                    source.sendError((Text)Text.literal((String)"That is not a valid color."));
+                    source.sendError(GuildTexts.t("error.color_not_color"));
                     return 0;
                 }
             }
             catch (IllegalArgumentException e) {
-                source.sendError((Text)Text.literal((String)"Invalid color. Use names like red, blue, green."));
+                source.sendError(GuildTexts.t("error.color_invalid_name"));
                 return 0;
             }
             UUID playerId = player.getUuid();
             String playerName = player.getName().getString();
             if (GuildDataManager.getGuildByPlayer(playerId) != null) {
-                source.sendError((Text)Text.literal((String)"You are already in a guild."));
+                source.sendError(GuildTexts.t("error.already_in_guild"));
                 return 0;
             }
             if (GuildDataManager.isGuildNameTaken(name)) {
-                source.sendError((Text)Text.literal((String)"A guild with that name already exists."));
+                source.sendError(GuildTexts.t("error.guild_name_taken"));
                 return 0;
             }
             Guild guild = new Guild(UUID.randomUUID(), name, color.getName(), Instant.now(), playerId, playerName, false);
@@ -138,16 +141,14 @@ public class GuildCommand {
                 System.out.println("[GuildsRemastered] Reused existing team: " + teamName);
             }
             source.getServer().getCommandManager().executeWithPrefix(source.getServer().getCommandSource(), "team join " + teamName + " " + player.getName().getString());
-            String modifyTeamColorCommand = "/team modify " + teamName + " color " + color.getName().toLowerCase();
-            source.getServer().getCommandManager().executeWithPrefix(source.getServer().getCommandSource(), modifyTeamColorCommand);
-            System.out.println("[GuildsRemastered] Set team color for " + teamName + " to " + color.getName().toLowerCase());
+            GuildTeamUtil.forceUpdateForPlayer(player);
             if (GuildsConfig.enableEssentialsCommandGuildPrefix) {
                 GuildPrefixHelper.applyGuildPrefix(player);
             }
             if (GuildsConfig.enableHungerBoundIntegration) {
                 GuildHungerBoundPrefixHelper.applyGuildHungerBoundPrefix(player);
             }
-            source.sendFeedback(() -> Text.literal((String)"Guild ").append((Text)Text.literal((String)name).formatted(color)).append(" created successfully!"), false);
+            source.sendFeedback(() -> GuildTexts.t("create.success_prefix").append(Text.literal(name).formatted(color)).append(GuildTexts.t("create.success_suffix")), false);
             return 1;
         }))))).then(((LiteralArgumentBuilder)CommandManager.literal((String)"info").executes(ctx -> {
             ServerCommandSource source = (ServerCommandSource)ctx.getSource();
@@ -155,7 +156,7 @@ public class GuildCommand {
             UUID playerId = player.getUuid();
             Guild guild = GuildDataManager.getGuildByPlayer(playerId);
             if (guild == null) {
-                source.sendError((Text)Text.literal((String)"You are not in a guild."));
+                source.sendError(GuildTexts.t("error.not_in_guild"));
                 return 0;
             }
             GuildCommand.displayGuildInfo(source.getServer(), source, guild);
@@ -169,7 +170,7 @@ public class GuildCommand {
                 guild = GuildDataManager.getGuildByPlayer(player.getUuid());
             }
             if (guild == null) {
-                source.sendError((Text)Text.literal((String)"No guild found by that name or player."));
+                source.sendError(GuildTexts.t("error.info_not_found"));
                 return 0;
             }
             GuildCommand.displayGuildInfo(source.getServer(), source, guild);
@@ -179,16 +180,16 @@ public class GuildCommand {
             ServerPlayerEntity player = source.getPlayer();
             Guild guild = GuildDataManager.getGuildByPlayer(player.getUuid());
             if (guild == null) {
-                source.sendError((Text)Text.literal((String)"You are not in a guild."));
+                source.sendError(GuildTexts.t("error.not_in_guild"));
                 return 0;
             }
             if (!guild.getOwnerId().equals(player.getUuid())) {
-                source.sendError((Text)Text.literal((String)"Only the guild owner can disband the guild."));
+                source.sendError(GuildTexts.t("error.only_owner_disband"));
                 return 0;
             }
-            MutableText yesButton = Text.literal((String)"[YES]").setStyle(Style.EMPTY.withColor(Formatting.RED).withClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/guild disbandconfirm")).withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, Text.literal((String)"Click to disband your guild"))));
-            MutableText noButton = Text.literal((String)"[NO]").setStyle(Style.EMPTY.withColor(Formatting.GREEN).withClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/guild cancel")).withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, Text.literal((String)"Click to cancel"))));
-            player.sendMessage((Text)Text.literal((String)"Are you sure you want to disband your guild? ").formatted(Formatting.GOLD).append((Text)yesButton).append((Text)Text.literal((String)" ")).append((Text)noButton), false);
+            MutableText yesButton = GuildTexts.t("common.button_yes").setStyle(Style.EMPTY.withColor(Formatting.RED).withClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/guild disbandconfirm")).withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, GuildTexts.t("disband.hover_yes"))));
+            MutableText noButton = GuildTexts.t("common.button_no").setStyle(Style.EMPTY.withColor(Formatting.GREEN).withClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/guild cancel")).withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, GuildTexts.t("common.hover_cancel"))));
+            player.sendMessage(GuildTexts.t("disband.confirm_question").formatted(Formatting.GOLD).append(yesButton).append(Text.literal(" ")).append(noButton), false);
             return 1;
         }))).then(CommandManager.literal((String)"disbandconfirm").executes(ctx -> {
             ServerCommandSource source = (ServerCommandSource)ctx.getSource();
@@ -197,11 +198,11 @@ public class GuildCommand {
             UUID playerId = player.getUuid();
             Guild guild = GuildDataManager.getGuildByPlayer(playerId);
             if (guild == null) {
-                source.sendError((Text)Text.literal((String)"You are not in a guild."));
+                source.sendError(GuildTexts.t("error.not_in_guild"));
                 return 0;
             }
             if (!guild.getOwnerId().equals(playerId)) {
-                source.sendError((Text)Text.literal((String)"Only the guild owner can disband the guild."));
+                source.sendError(GuildTexts.t("error.only_owner_disband"));
                 return 0;
             }
             String teamName = "guild_" + guild.getId().toString().substring(0, 8);
@@ -241,14 +242,14 @@ public class GuildCommand {
                 for (UUID memberId : allyGuild.getMembers().keySet()) {
                     ServerPlayerEntity allyPlayer = server.getPlayerManager().getPlayer(memberId);
                     if (allyPlayer == null) continue;
-                    allyPlayer.sendMessage((Text)Text.literal((String)"Your ally ").append((Text)Text.literal((String)disbandedName).formatted(Formatting.YELLOW)).append((Text)Text.literal((String)" has disbanded and is no longer an ally.")));
+                    allyPlayer.sendMessage(GuildTexts.t("disband.ally_notice_prefix").append(Text.literal(disbandedName).formatted(Formatting.YELLOW)).append(GuildTexts.t("disband.ally_notice_suffix")));
                 }
             }
             GuildDataManager.removeAllInvitesToGuild(guild.getId());
             GuildDataManager.deleteGuild(server, guild.getId());
             String guildShortId = guild.getShortenedId();
             GuildBankManager.deleteBank(server, guildShortId);
-            source.sendFeedback(() -> Text.literal((String)"Guild ").append((Text)Text.literal((String)guild.getName()).formatted(Formatting.RED)).append(" has been disbanded."), false);
+            source.sendFeedback(() -> GuildTexts.t("disband.success_prefix").append(Text.literal(guild.getName()).formatted(Formatting.RED)).append(GuildTexts.t("disband.success_suffix")), false);
             return 1;
         }))).then(CommandManager.literal((String)"invite").then(CommandManager.argument((String)"player", (ArgumentType)StringArgumentType.word()).suggests((ctx, builder) -> {
             for (ServerPlayerEntity p : ((ServerCommandSource)ctx.getSource()).getServer().getPlayerManager().getPlayerList()) {
@@ -263,7 +264,7 @@ public class GuildCommand {
             ServerPlayerEntity target = server.getPlayerManager().getPlayer(targetName);
             System.out.println("[GuildsRemastered] Attempting to invite " + targetName + " by player " + inviter.getName().getString());
             if (target == null) {
-                source.sendError((Text)Text.literal((String)"Player not found."));
+                source.sendError(GuildTexts.t("error.player_not_found"));
                 System.out.println("[GuildsRemastered] Player not found: " + targetName);
                 return 0;
             }
@@ -271,25 +272,25 @@ public class GuildCommand {
             UUID targetId = target.getUuid();
             Guild guild = GuildDataManager.getGuildByPlayer(inviterId);
             if (guild == null) {
-                source.sendError((Text)Text.literal((String)"You are not in a guild."));
+                source.sendError(GuildTexts.t("error.not_in_guild"));
                 System.out.println("[GuildsRemastered] Inviter not in a guild: " + inviter.getName().getString());
                 return 0;
             }
             String inviterRank = guild.getRank(inviterId).toLowerCase();
             System.out.println("[GuildsRemastered] Inviter rank: " + inviterRank);
             if (!guild.hasRankPermission(inviterId, "canInvite")) {
-                source.sendError((Text)Text.literal((String)"You do not have permission to invite players to the guild."));
+                source.sendError(GuildTexts.t("error.no_invite_permission"));
                 return 0;
             }
             if (GuildDataManager.getGuildByPlayer(targetId) != null) {
-                source.sendError((Text)Text.literal((String)"That player is already in a guild."));
+                source.sendError(GuildTexts.t("error.target_already_in_guild"));
                 System.out.println("[GuildsRemastered] Target player is already in a guild: " + targetName);
                 return 0;
             }
             GuildDataManager.addInvite(targetId, guild.getId());
-            inviter.sendMessage((Text)Text.literal((String)("Invitation sent to " + target.getName().getString())).formatted(Formatting.GREEN));
-            MutableText acceptButton = Text.literal((String)"[ACCEPT]").setStyle(Style.EMPTY.withColor(Formatting.GREEN).withClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/guild accept")).withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, Text.literal((String)"Click to join the guild"))));
-            target.sendMessage((Text)Text.literal((String)"You have been invited to join the guild ").append((Text)Text.literal((String)guild.getName()).formatted(Formatting.YELLOW)).append((Text)Text.literal((String)". ")).append((Text)acceptButton), false);
+            inviter.sendMessage(GuildTexts.t("invite.sent", target.getName().getString()).formatted(Formatting.GREEN));
+            MutableText acceptButton = GuildTexts.t("invite.button_accept").setStyle(Style.EMPTY.withColor(Formatting.GREEN).withClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/guild accept")).withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, GuildTexts.t("invite.hover_accept"))));
+            target.sendMessage(GuildTexts.t("invite.target_line_prefix").append(Text.literal(guild.getName()).formatted(Formatting.YELLOW)).append(GuildTexts.t("invite.target_line_suffix")).append(acceptButton), false);
             System.out.println("[GuildsRemastered] Invitation sent to " + targetName + " for guild " + guild.getName());
             return 1;
         })))).then(CommandManager.literal((String)"accept").executes(ctx -> {
@@ -299,18 +300,18 @@ public class GuildCommand {
             UUID guildId = GuildDataManager.getInvite(playerId);
             System.out.println("[GuildsRemastered] Player " + player.getName().getString() + " is attempting to accept an invite.");
             if (guildId == null) {
-                source.sendError((Text)Text.literal((String)"You do not have any pending invitations."));
+                source.sendError(GuildTexts.t("error.no_pending_invite"));
                 System.out.println("[GuildsRemastered] No pending invites for " + player.getName().getString());
                 return 0;
             }
             if (GuildDataManager.getGuildByPlayer(playerId) != null) {
-                source.sendError((Text)Text.literal((String)"You are already in a guild."));
+                source.sendError(GuildTexts.t("error.already_in_guild"));
                 System.out.println("[GuildsRemastered] Player " + player.getName().getString() + " is already in a guild.");
                 return 0;
             }
             Guild guild = GuildDataManager.getGuildById(guildId);
             if (guild == null) {
-                source.sendError((Text)Text.literal((String)"The guild you were invited to no longer exists."));
+                source.sendError(GuildTexts.t("error.invite_guild_gone"));
                 System.out.println("[GuildsRemastered] Guild no longer exists: " + String.valueOf(guildId));
                 return 0;
             }
@@ -319,16 +320,17 @@ public class GuildCommand {
             GuildDataManager.saveGuild(source.getServer(), guild);
             String teamName = "guild_" + guild.getId().toString().substring(0, 8);
             source.getServer().getCommandManager().executeWithPrefix(source.getServer().getCommandSource(), "team join " + teamName + " " + player.getName().getString());
+            GuildTeamUtil.forceUpdateForPlayer(player);
             if (GuildsConfig.enableEssentialsCommandGuildPrefix) {
                 GuildPrefixHelper.applyGuildPrefix(player);
             }
             if (GuildsConfig.enableHungerBoundIntegration) {
                 GuildHungerBoundPrefixHelper.applyGuildHungerBoundPrefix(player);
             }
-            Objects.requireNonNull(player.getServer()).getPlayerManager().broadcast((Text)Text.literal((String)(player.getName().getString() + " has joined the guild " + guild.getName() + "!")), false);
-            source.sendFeedback(() -> Text.literal((String)"You have joined the guild ").append((Text)Text.literal((String)guild.getName()).formatted(Formatting.YELLOW)).append("!"), false);
+            Objects.requireNonNull(player.getServer()).getPlayerManager().broadcast(GuildTexts.t("join.broadcast", player.getName().getString(), guild.getName()), false);
+            source.sendFeedback(() -> GuildTexts.t("join.feedback_prefix").append(Text.literal(guild.getName()).formatted(Formatting.YELLOW)).append(GuildTexts.t("join.feedback_suffix")), false);
             if (guild.getMotd() != null && !guild.getMotd().isEmpty()) {
-                player.sendMessage((Text)Text.literal((String)"Guild MOTD: ").append((Text)Text.literal((String)guild.getMotd()).styled(style -> style.withColor(Formatting.YELLOW).withItalic(Boolean.valueOf(true)))), false);
+                player.sendMessage(GuildTexts.t("join.motd_label").append(Text.literal(guild.getMotd()).styled(style -> style.withColor(Formatting.YELLOW).withItalic(Boolean.valueOf(true)))), false);
             }
             System.out.println("[GuildsRemastered] Player " + player.getName().getString() + " joined guild: " + guild.getName());
             return 1;
@@ -339,11 +341,11 @@ public class GuildCommand {
             UUID playerId = player.getUuid();
             Guild guild = GuildDataManager.getGuildByPlayer(playerId);
             if (guild == null) {
-                source.sendError((Text)Text.literal((String)"You are not in a guild."));
+                source.sendError(GuildTexts.t("error.not_in_guild"));
                 return 0;
             }
             if (guild.getOwnerId().equals(playerId)) {
-                source.sendError((Text)Text.literal((String)"You are the Guild Master. Use /guild disband instead."));
+                source.sendError(GuildTexts.t("error.quit_is_master"));
                 return 0;
             }
             String playerName = player.getName().getString();
@@ -358,11 +360,11 @@ public class GuildCommand {
             GuildTeamUtil.clearTeamForPlayer(player, server);
             GuildTeamUtil.forceUpdateForPlayer(player);
             server.getCommandManager().executeWithPrefix(server.getCommandSource(), "team leave " + playerName);
-            player.sendMessage((Text)Text.literal((String)("You have left the guild " + guild.getName())).formatted(Formatting.GOLD));
+            player.sendMessage(GuildTexts.t("quit.self", guild.getName()).formatted(Formatting.GOLD));
             for (UUID memberId : guild.getMembers().keySet()) {
                 ServerPlayerEntity member = server.getPlayerManager().getPlayer(memberId);
                 if (member == null) continue;
-                member.sendMessage((Text)Text.literal((String)(playerName + " has left the guild.")).formatted(Formatting.GRAY));
+                member.sendMessage(GuildTexts.t("quit.broadcast", playerName).formatted(Formatting.GRAY));
             }
             return 1;
         }))).then(CommandManager.literal((String)"kick").then(CommandManager.argument((String)"player", (ArgumentType)StringArgumentType.word()).suggests((ctx, builder) -> {
@@ -384,11 +386,11 @@ public class GuildCommand {
             String targetName = StringArgumentType.getString((CommandContext)ctx, (String)"player");
             Guild guild = GuildDataManager.getGuildByPlayer(executor.getUuid());
             if (guild == null) {
-                source.sendError((Text)Text.literal((String)"You are not in a guild."));
+                source.sendError(GuildTexts.t("error.not_in_guild"));
                 return 0;
             }
             if (!guild.hasRankPermission(executor.getUuid(), "canKick")) {
-                source.sendError((Text)Text.literal((String)"You do not have permission to kick members from the guild."));
+                source.sendError(GuildTexts.t("error.no_kick_permission"));
                 return 0;
             }
             UUID targetId = null;
@@ -400,17 +402,17 @@ public class GuildCommand {
                 break;
             }
             if (targetId == null || targetId.equals(executor.getUuid())) {
-                source.sendError((Text)Text.literal((String)"Invalid target. You cannot kick yourself or a non-member."));
+                source.sendError(GuildTexts.t("error.kick_invalid_target"));
                 return 0;
             }
             if (targetId.equals(guild.getOwnerId())) {
-                source.sendError((Text)Text.literal((String)"You cannot kick the Guild Master."));
+                source.sendError(GuildTexts.t("error.cannot_kick_master"));
                 return 0;
             }
             guild.removeMember(targetId);
             GuildDataManager.saveGuild(server, guild);
             String kickedName = targetInfo.name;
-            source.sendFeedback(() -> Text.literal((String)(kickedName + " has been kicked from the guild.")), false);
+            source.sendFeedback(() -> GuildTexts.t("kick.executor_feedback", kickedName), false);
             ServerPlayerEntity kicked = server.getPlayerManager().getPlayer(targetId);
             if (kicked != null) {
                 if (GuildsConfig.enableEssentialsCommandGuildPrefix) {
@@ -421,13 +423,13 @@ public class GuildCommand {
                 }
                 GuildTeamUtil.clearTeamForPlayer(kicked, server);
                 GuildTeamUtil.forceUpdateForPlayer(kicked);
-                kicked.sendMessage((Text)Text.literal((String)("You have been kicked from the guild " + guild.getName())).formatted(Formatting.RED));
+                kicked.sendMessage(GuildTexts.t("kick.target_message", guild.getName()).formatted(Formatting.RED));
                 server.getCommandManager().executeWithPrefix(server.getCommandSource(), "team leave " + kickedName);
             }
             for (UUID memberId : guild.getMembers().keySet()) {
                 ServerPlayerEntity member = server.getPlayerManager().getPlayer(memberId);
                 if (member == null) continue;
-                member.sendMessage((Text)Text.literal((String)(kickedName + " has been kicked from the guild.")).formatted(Formatting.GRAY));
+                member.sendMessage(GuildTexts.t("kick.broadcast", kickedName).formatted(Formatting.GRAY));
             }
             return 1;
         })))).then(CommandManager.literal((String)"chat").executes(ctx -> {
@@ -436,15 +438,15 @@ public class GuildCommand {
             UUID playerId = player.getUuid();
             Guild guild = GuildDataManager.getGuildByPlayer(playerId);
             if (guild == null) {
-                source.sendError((Text)Text.literal((String)"You are not in a guild."));
+                source.sendError(GuildTexts.t("error.not_in_guild"));
                 return 0;
             }
             GuildDataManager.ChatStateManager.toggleGuildChat(playerId);
             boolean enabled = GuildDataManager.ChatStateManager.isGuildChatEnabled(playerId);
             if (enabled) {
-                player.sendMessage((Text)Text.literal((String)"\ud83d\udfe2 Guild Chat Enabled! ").formatted(Formatting.GREEN).append((Text)Text.literal((String)"Your messages will now only go to your guild.")).formatted(Formatting.GRAY), false);
+                player.sendMessage(GuildTexts.t("chat.toggle_on_title").formatted(Formatting.GREEN).append(GuildTexts.t("chat.toggle_on_sub").formatted(Formatting.GRAY)), false);
             } else {
-                player.sendMessage((Text)Text.literal((String)"\ud83d\udd34 Guild Chat Disabled. ").formatted(Formatting.RED).append((Text)Text.literal((String)"You're now talking in global chat.")).formatted(Formatting.GRAY), false);
+                player.sendMessage(GuildTexts.t("chat.toggle_off_title").formatted(Formatting.RED).append(GuildTexts.t("chat.toggle_off_sub").formatted(Formatting.GRAY)), false);
             }
             return 1;
         }))).then(CommandManager.literal((String)"promote").then(CommandManager.argument((String)"player", (ArgumentType)StringArgumentType.word()).suggests((ctx, builder) -> {
@@ -468,11 +470,11 @@ public class GuildCommand {
             String targetName = StringArgumentType.getString((CommandContext)ctx, (String)"player");
             Guild guild = GuildDataManager.getGuildByPlayer(executor.getUuid());
             if (guild == null) {
-                source.sendError((Text)Text.literal((String)"You are not in a guild."));
+                source.sendError(GuildTexts.t("error.not_in_guild"));
                 return 0;
             }
             if (!guild.hasRankPermission(executor.getUuid(), "canPromote")) {
-                source.sendError((Text)Text.literal((String)"You do not have permission to promote members in the guild."));
+                source.sendError(GuildTexts.t("error.no_promote_permission"));
                 return 0;
             }
             UUID targetId = null;
@@ -484,7 +486,7 @@ public class GuildCommand {
                 break;
             }
             if (targetId == null || targetId.equals(executor.getUuid())) {
-                source.sendError((Text)Text.literal((String)"Invalid target. You cannot promote yourself or a non-member."));
+                source.sendError(GuildTexts.t("error.promote_invalid_target"));
                 return 0;
             }
             String currentRank = targetInfo.rank.toLowerCase();
@@ -495,14 +497,14 @@ public class GuildCommand {
                 newRank = "Officer";
             }
             if (newRank == null) {
-                source.sendError((Text)Text.literal((String)("Cannot promote " + targetInfo.name + " any further.")));
+                source.sendError(GuildTexts.t("error.promote_max", targetInfo.name));
                 return 0;
             }
             targetInfo.rank = newRank;
             GuildDataManager.saveGuild(server, guild);
             Guild.GuildMemberInfo finalTargetInfo = targetInfo;
             String promotedTo = newRank;
-            source.sendFeedback(() -> Text.literal((String)(finalTargetInfo.name + " has been promoted to " + promotedTo + ".")), false);
+            source.sendFeedback(() -> GuildTexts.t("promote.success", finalTargetInfo.name, promotedTo), false);
             return 1;
         })))).then(CommandManager.literal((String)"demote").then(CommandManager.argument((String)"player", (ArgumentType)StringArgumentType.word()).suggests((ctx, builder) -> {
             ServerPlayerEntity executor = ((ServerCommandSource)ctx.getSource()).getPlayer();
@@ -525,11 +527,11 @@ public class GuildCommand {
             String targetName = StringArgumentType.getString((CommandContext)ctx, (String)"player");
             Guild guild = GuildDataManager.getGuildByPlayer(executor.getUuid());
             if (guild == null) {
-                source.sendError((Text)Text.literal((String)"You are not in a guild."));
+                source.sendError(GuildTexts.t("error.not_in_guild"));
                 return 0;
             }
             if (!guild.hasRankPermission(executor.getUuid(), "canDemote")) {
-                source.sendError((Text)Text.literal((String)"You do not have permission to demote members in the guild."));
+                source.sendError(GuildTexts.t("error.no_demote_permission"));
                 return 0;
             }
             UUID executorId = executor.getUuid();
@@ -542,11 +544,11 @@ public class GuildCommand {
                 break;
             }
             if (targetId == null || targetId.equals(executorId)) {
-                source.sendError((Text)Text.literal((String)"Invalid target. You cannot demote yourself or a non-member."));
+                source.sendError(GuildTexts.t("error.demote_invalid_target"));
                 return 0;
             }
             if (targetId.equals(guild.getOwnerId())) {
-                source.sendError((Text)Text.literal((String)"You cannot demote the Guild Master."));
+                source.sendError(GuildTexts.t("error.cannot_demote_master"));
                 return 0;
             }
             String currentRank = targetInfo.rank.toLowerCase();
@@ -557,14 +559,14 @@ public class GuildCommand {
                 newRank = "Initiate";
             }
             if (newRank == null) {
-                source.sendError((Text)Text.literal((String)("Cannot demote " + targetInfo.name + " any further.")));
+                source.sendError(GuildTexts.t("error.demote_min", targetInfo.name));
                 return 0;
             }
             targetInfo.rank = newRank;
             GuildDataManager.saveGuild(server, guild);
             Guild.GuildMemberInfo finalTargetInfo = targetInfo;
             String demotedTo = newRank;
-            source.sendFeedback(() -> Text.literal((String)(finalTargetInfo.name + " has been demoted to " + demotedTo + ".")), false);
+            source.sendFeedback(() -> GuildTexts.t("demote.success", finalTargetInfo.name, demotedTo), false);
             return 1;
         })))).then(CommandManager.literal((String)"toggle_friendlyfire").executes(ctx -> {
             ServerCommandSource source = (ServerCommandSource)ctx.getSource();
@@ -572,24 +574,24 @@ public class GuildCommand {
             UUID playerId = player.getUuid();
             Guild guild = GuildDataManager.getGuildByPlayer(playerId);
             if (guild == null) {
-                source.sendError((Text)Text.literal((String)"You are not in a guild."));
+                source.sendError(GuildTexts.t("error.not_in_guild"));
                 return 0;
             }
             if (!guild.hasRankPermission(playerId, "canTogglePvP")) {
-                source.sendError((Text)Text.literal((String)"Only the Guild Master or Officers can toggle friendly fire."));
+                source.sendError(GuildTexts.t("error.ff_no_permission"));
                 return 0;
             }
             String teamName = "guild_" + guild.getId().toString().substring(0, 8);
             ServerScoreboard scoreboard = player.getServer().getScoreboard();
             Team team = scoreboard.getTeam(teamName);
             if (team == null) {
-                source.sendError((Text)Text.literal((String)"Your guild team was not found."));
+                source.sendError(GuildTexts.t("error.team_not_found"));
                 return 0;
             }
             boolean current = team.isFriendlyFireAllowed();
             team.setFriendlyFireAllowed(!current);
             Formatting stateFmt = !current ? Formatting.GREEN : Formatting.RED;
-            source.sendFeedback(() -> Text.literal((String)"Friendly fire has been ").append(Text.literal((String)(!current ? "enabled" : "disabled")).formatted(stateFmt)), true);
+            source.sendFeedback(() -> GuildTexts.t("friendly_fire.prefix").append(GuildTexts.t(!current ? "friendly_fire.enabled" : "friendly_fire.disabled").formatted(stateFmt)), true);
             return 1;
         }))).then(CommandManager.literal((String)"motd").then(CommandManager.argument((String)"message", (ArgumentType)StringArgumentType.greedyString()).executes(ctx -> {
             boolean isOfficer;
@@ -598,53 +600,53 @@ public class GuildCommand {
             UUID playerId = player.getUuid();
             Guild guild = GuildDataManager.getGuildByPlayer(playerId);
             if (guild == null) {
-                source.sendError((Text)Text.literal((String)"You are not in a guild."));
+                source.sendError(GuildTexts.t("error.not_in_guild"));
                 return 0;
             }
             Guild.GuildMemberInfo info = guild.getMembers().get(playerId);
             boolean bl = isOfficer = info != null && info.rank != null && info.rank.equalsIgnoreCase("officer");
             if (!guild.getOwnerId().equals(playerId) && !isOfficer) {
-                source.sendError((Text)Text.literal((String)"Only the guild master or an officer can set the MOTD."));
+                source.sendError(GuildTexts.t("error.motd_no_permission"));
                 return 0;
             }
             String motd = StringArgumentType.getString((CommandContext)ctx, (String)"message");
             guild.setMotd(motd);
             GuildDataManager.saveGuild(source.getServer(), guild);
-            source.sendFeedback(() -> Text.literal((String)"Guild MOTD updated to: ").append((Text)Text.literal((String)motd).styled(style -> style.withColor(Formatting.YELLOW))), false);
+            source.sendFeedback(() -> GuildTexts.t("motd.updated_prefix").append(Text.literal(motd).styled(style -> style.withColor(Formatting.YELLOW))), false);
             return 1;
         })))).then(CommandManager.literal((String)"rename").then(CommandManager.argument((String)"name", (ArgumentType)StringArgumentType.word()).then(CommandManager.argument((String)"color", (ArgumentType)StringArgumentType.word()).executes(ctx -> {
             Formatting color;
             ServerCommandSource source = (ServerCommandSource)ctx.getSource();
             ServerPlayerEntity player = source.getPlayer();
             String newName = StringArgumentType.getString((CommandContext)ctx, (String)"name");
-            if (newName.length() > 13) {
-                source.sendError((Text)Text.literal((String)"The guild name must be 13 characters or fewer."));
+            if (!GuildNameUtil.isWithinMaxLength(newName)) {
+                source.sendError(GuildTexts.t("error.guild_name_too_long", GuildNameUtil.MAX_GUILD_NAME_CODE_POINTS));
                 return 0;
             }
             String colorName = StringArgumentType.getString((CommandContext)ctx, (String)"color").toUpperCase();
             try {
                 color = Formatting.valueOf((String)colorName);
                 if (!color.isColor()) {
-                    source.sendError((Text)Text.literal((String)"That is not a valid color."));
+                    source.sendError(GuildTexts.t("error.color_not_color"));
                     return 0;
                 }
             }
             catch (IllegalArgumentException e) {
-                source.sendError((Text)Text.literal((String)"Invalid color. Use names like red, blue, green."));
+                source.sendError(GuildTexts.t("error.color_invalid_name"));
                 return 0;
             }
             UUID playerId = player.getUuid();
             Guild guild = GuildDataManager.getGuildByPlayer(playerId);
             if (guild == null) {
-                source.sendError((Text)Text.literal((String)"You are not in a guild."));
+                source.sendError(GuildTexts.t("error.not_in_guild"));
                 return 0;
             }
             if (!guild.getOwnerId().equals(playerId)) {
-                source.sendError((Text)Text.literal((String)"Only the guild master can rename the guild."));
+                source.sendError(GuildTexts.t("error.rename_not_owner"));
                 return 0;
             }
             if (GuildDataManager.isGuildNameTaken(newName)) {
-                source.sendError((Text)Text.literal((String)"A guild with that name already exists."));
+                source.sendError(GuildTexts.t("error.guild_name_taken"));
                 return 0;
             }
             String oldName = guild.getName();
@@ -665,15 +667,18 @@ public class GuildCommand {
                 for (UUID memberId : allyGuild.getMembers().keySet()) {
                     ServerPlayerEntity allyPlayer = server.getPlayerManager().getPlayer(memberId);
                     if (allyPlayer == null) continue;
-                    allyPlayer.sendMessage((Text)Text.literal((String)"Your ally ").append((Text)Text.literal((String)oldName).formatted(Formatting.GREEN)).append((Text)Text.literal((String)" has changed its name to ")).append((Text)Text.literal((String)newName).formatted(Formatting.GREEN)).append((Text)Text.literal((String)".")));
+                    allyPlayer.sendMessage(GuildTexts.t("rename.ally_notice_prefix").append(Text.literal(oldName).formatted(Formatting.GREEN)).append(GuildTexts.t("rename.ally_notice_mid")).append(Text.literal(newName).formatted(Formatting.GREEN)).append(GuildTexts.t("rename.ally_notice_suffix")));
                 }
             }
             String teamName = "guild_" + guild.getId().toString().substring(0, 8);
             ServerScoreboard scoreboard = server.getScoreboard();
             Team team = scoreboard.getTeam(teamName);
             if (team != null) {
-                team.setColor(color);
-                System.out.println("[GuildsRemastered] Updated team color for " + teamName + " to " + color.getName().toLowerCase());
+                team.setPrefix(Text.empty());
+                team.setSuffix(GuildDisplayUtil.guildSuffixBracketText(guild));
+                team.setDisplayName(Text.literal(guild.getName()));
+                team.setColor(Formatting.WHITE);
+                GuildTeamUtil.broadcastTeamUpdate(server, team);
             }
             for (UUID memberId : guild.getMembers().keySet()) {
                 ServerPlayerEntity member = server.getPlayerManager().getPlayer(memberId);
@@ -684,7 +689,7 @@ public class GuildCommand {
                 if (!GuildsConfig.enableHungerBoundIntegration) continue;
                 GuildHungerBoundPrefixHelper.applyGuildHungerBoundPrefix(member);
             }
-            source.sendFeedback(() -> Text.literal((String)"Guild successfully renamed to ").append((Text)Text.literal((String)newName).formatted(color)).append((Text)Text.literal((String)".")), false);
+            source.sendFeedback(() -> GuildTexts.t("rename.success_prefix").append(Text.literal(newName).formatted(color)).append(GuildTexts.t("rename.success_suffix")), false);
             return 1;
         }))))).then(CommandManager.literal((String)"sethome").executes(ctx -> {
             ServerCommandSource source = (ServerCommandSource)ctx.getSource();
@@ -692,18 +697,18 @@ public class GuildCommand {
             UUID playerId = player.getUuid();
             Guild guild = GuildDataManager.getGuildByPlayer(playerId);
             if (guild == null) {
-                source.sendError((Text)Text.literal((String)"You are not in a guild."));
+                source.sendError(GuildTexts.t("error.not_in_guild"));
                 return 0;
             }
             if (!guild.hasRankPermission(playerId, "canSetHome")) {
-                source.sendError((Text)Text.literal((String)"You do not have permission to use /guild sethome."));
+                source.sendError(GuildTexts.t("error.no_sethome_permission"));
                 return 0;
             }
             Vec3d pos = player.getPos();
             String worldKey = player.getWorld().getRegistryKey().getValue().toString();
             guild.setHome(pos.getX(), pos.getY(), pos.getZ(), worldKey);
             GuildDataManager.saveGuild(source.getServer(), guild);
-            source.sendFeedback(() -> Text.literal((String)"Guild home set!"), false);
+            source.sendFeedback(() -> GuildTexts.t("home.set_success"), false);
             return 1;
         }))).then(CommandManager.literal((String)"home").executes(ctx -> {
             ServerCommandSource source = (ServerCommandSource)ctx.getSource();
@@ -711,36 +716,36 @@ public class GuildCommand {
             UUID playerId = player.getUuid();
             Guild guild = GuildDataManager.getGuildByPlayer(playerId);
             if (guild == null) {
-                source.sendError((Text)Text.literal((String)"You are not in a guild."));
+                source.sendError(GuildTexts.t("error.not_in_guild"));
                 return 0;
             }
             if (!guild.hasRankPermission(playerId, "canUseHome")) {
-                source.sendError((Text)Text.literal((String)"You do not have permission to use the guild home."));
+                source.sendError(GuildTexts.t("error.no_home_permission"));
                 return 0;
             }
             if (!guild.hasHome()) {
-                source.sendError((Text)Text.literal((String)"Your guild has not set a home yet."));
+                source.sendError(GuildTexts.t("error.home_not_set"));
                 return 0;
             }
             String worldName = guild.getHomeWorld();
             String[] parts = worldName.split(":");
             if (parts.length != 2) {
-                source.sendError((Text)Text.literal((String)("Invalid world identifier: " + worldName)));
+                source.sendError(GuildTexts.t("error.home_invalid_world", worldName));
                 return 0;
             }
             RegistryKey<World> worldKey = RegistryKey.of(RegistryKeys.WORLD, new Identifier(parts[0], parts[1]));
             ServerWorld world = source.getServer().getWorld(worldKey);
             if (world == null) {
-                source.sendError((Text)Text.literal((String)"The world for the guild home could not be found."));
+                source.sendError(GuildTexts.t("error.home_world_missing"));
                 return 0;
             }
             int delaySeconds = GuildsConfig.guildHomeTeleportDelaySeconds;
             int delayTicks = delaySeconds * 20;
-            player.sendMessage((Text)Text.literal((String)("Teleporting to your guild home in " + delaySeconds + " seconds...")).formatted(Formatting.AQUA), false);
+            player.sendMessage(GuildTexts.t("home.teleport_pending", delaySeconds).formatted(Formatting.AQUA), false);
             DelayedTeleportScheduler.schedule(player, delayTicks, () -> {
                 if (player.isAlive() && player.getWorld() != null) {
                     player.teleport(world, guild.getHomeX(), guild.getHomeY(), guild.getHomeZ(), player.getYaw(), player.getPitch());
-                    player.sendMessage((Text)Text.literal((String)"You have arrived at your guild home.").formatted(Formatting.GREEN), false);
+                    player.sendMessage(GuildTexts.t("home.teleport_done").formatted(Formatting.GREEN), false);
                 }
             });
             return 1;
@@ -751,40 +756,40 @@ public class GuildCommand {
             String targetGuildName = StringArgumentType.getString((CommandContext)ctx, (String)"guild");
             Guild senderGuild = GuildDataManager.getGuildByPlayer(sender.getUuid());
             if (senderGuild == null) {
-                source.sendError((Text)Text.literal((String)"You are not in a guild."));
+                source.sendError(GuildTexts.t("error.not_in_guild"));
                 return 0;
             }
             String senderRank = senderGuild.getRank(sender.getUuid());
             if (!senderRank.equalsIgnoreCase("guild master")) {
-                source.sendError((Text)Text.literal((String)"Only guild masters can propose alliances."));
+                source.sendError(GuildTexts.t("error.ally_only_master"));
                 return 0;
             }
             Guild targetGuild = GuildDataManager.getGuildByName(targetGuildName);
             if (targetGuild == null) {
-                source.sendError((Text)Text.literal((String)("Guild not found: " + targetGuildName)));
+                source.sendError(GuildTexts.t("error.ally_guild_not_found", targetGuildName));
                 return 0;
             }
             if (senderGuild.getId().equals(targetGuild.getId())) {
-                source.sendError((Text)Text.literal((String)"You cannot ally with your own guild."));
+                source.sendError(GuildTexts.t("error.ally_self"));
                 return 0;
             }
             String targetShortId = "guild_" + targetGuild.getId().toString().substring(0, 8);
             if (senderGuild.getAllies().containsKey(targetShortId)) {
-                MutableText yesButton = Text.literal((String)"[YES]").setStyle(Style.EMPTY.withColor(Formatting.RED).withClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/guild allyrevoke " + targetShortId)).withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, Text.literal((String)"Click to revoke alliance"))));
-                MutableText noButton = Text.literal((String)"[NO]").setStyle(Style.EMPTY.withColor(Formatting.GREEN).withClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/guild cancel")).withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, Text.literal((String)"Click to cancel"))));
-                sender.sendMessage((Text)Text.literal((String)"You are already allied with ").append((Text)Text.literal((String)targetGuild.getName()).formatted(Formatting.YELLOW)).append((Text)Text.literal((String)". Do you want to revoke this alliance? ")).append((Text)yesButton).append((Text)Text.literal((String)" ")).append((Text)noButton), false);
+                MutableText yesButton = GuildTexts.t("common.button_yes").setStyle(Style.EMPTY.withColor(Formatting.RED).withClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/guild allyrevoke " + targetShortId)).withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, GuildTexts.t("ally.revoke_hover_yes"))));
+                MutableText noButton = GuildTexts.t("common.button_no").setStyle(Style.EMPTY.withColor(Formatting.GREEN).withClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/guild cancel")).withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, GuildTexts.t("common.hover_cancel"))));
+                sender.sendMessage(GuildTexts.t("ally.already_allied_prefix").append(Text.literal(targetGuild.getName()).formatted(Formatting.YELLOW)).append(GuildTexts.t("ally.already_allied_suffix")).append(yesButton).append(Text.literal(" ")).append(noButton), false);
                 return 0;
             }
             ServerPlayerEntity targetMaster = server.getPlayerManager().getPlayer(targetGuild.getOwnerId());
             if (targetMaster == null) {
-                source.sendError((Text)Text.literal((String)("The guild master of " + targetGuild.getName() + " is not online.")));
+                source.sendError(GuildTexts.t("error.ally_target_master_offline", targetGuild.getName()));
                 return 0;
             }
             GuildDataManager.addAllyRequest(targetGuild.getOwnerId(), senderGuild.getId());
-            sender.sendMessage((Text)Text.literal((String)("Alliance request sent to " + targetGuild.getName())).formatted(Formatting.GREEN), false);
-            MutableText acceptButton = Text.literal((String)"[ACCEPT]").setStyle(Style.EMPTY.withColor(Formatting.GREEN).withClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/guild allyaccept " + String.valueOf(senderGuild.getId()))).withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, Text.literal((String)"Click to accept the alliance"))));
-            MutableText denyButton = Text.literal((String)"[DENY]").setStyle(Style.EMPTY.withColor(Formatting.RED).withClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/guild allydeny " + String.valueOf(senderGuild.getId()))).withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, Text.literal((String)"Click to deny the alliance"))));
-            targetMaster.sendMessage((Text)Text.literal((String)"Your guild has received an alliance request from ").append((Text)Text.literal((String)senderGuild.getName()).formatted(Formatting.YELLOW)).append((Text)Text.literal((String)". ")).append((Text)acceptButton).append((Text)Text.literal((String)" ")).append((Text)denyButton), false);
+            sender.sendMessage(GuildTexts.t("ally.request_sent", targetGuild.getName()).formatted(Formatting.GREEN), false);
+            MutableText acceptButton = GuildTexts.t("ally.button_accept").setStyle(Style.EMPTY.withColor(Formatting.GREEN).withClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/guild allyaccept " + String.valueOf(senderGuild.getId()))).withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, GuildTexts.t("ally.hover_accept"))));
+            MutableText denyButton = GuildTexts.t("ally.button_deny").setStyle(Style.EMPTY.withColor(Formatting.RED).withClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/guild allydeny " + String.valueOf(senderGuild.getId()))).withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, GuildTexts.t("ally.hover_deny"))));
+            targetMaster.sendMessage(GuildTexts.t("ally.incoming_prefix").append(Text.literal(senderGuild.getName()).formatted(Formatting.YELLOW)).append(GuildTexts.t("ally.incoming_suffix")).append(acceptButton).append(Text.literal(" ")).append(denyButton), false);
             return 1;
         })))).then(CommandManager.literal((String)"allyaccept").then(CommandManager.argument((String)"guildId", (ArgumentType)StringArgumentType.word()).executes(ctx -> {
             UUID requesterGuildId;
@@ -796,26 +801,26 @@ public class GuildCommand {
                 requesterGuildId = UUID.fromString(guildIdStr);
             }
             catch (IllegalArgumentException e) {
-                source.sendError((Text)Text.literal((String)"Invalid guild ID format."));
+                source.sendError(GuildTexts.t("error.invalid_guild_id"));
                 return 0;
             }
             Guild receiverGuild = GuildDataManager.getGuildByPlayer(player.getUuid());
             if (receiverGuild == null) {
-                source.sendError((Text)Text.literal((String)"You are not in a guild."));
+                source.sendError(GuildTexts.t("error.not_in_guild"));
                 return 0;
             }
             if (!receiverGuild.getOwnerId().equals(player.getUuid())) {
-                source.sendError((Text)Text.literal((String)"Only the guild master can accept alliance requests."));
+                source.sendError(GuildTexts.t("error.ally_accept_not_master"));
                 return 0;
             }
             UUID expected = GuildDataManager.getAllyRequest(player.getUuid());
             if (!requesterGuildId.equals(expected)) {
-                source.sendError((Text)Text.literal((String)"No pending alliance request from that guild."));
+                source.sendError(GuildTexts.t("error.ally_no_pending"));
                 return 0;
             }
             Guild requesterGuild = GuildDataManager.getGuildById(requesterGuildId);
             if (requesterGuild == null) {
-                source.sendError((Text)Text.literal((String)"The requesting guild no longer exists."));
+                source.sendError(GuildTexts.t("error.ally_requester_gone"));
                 return 0;
             }
             receiverGuild.addAlly(requesterGuild.getId(), requesterGuild.getName());
@@ -824,10 +829,10 @@ public class GuildCommand {
             GuildDataManager.removeAllyRequest(player.getUuid());
             GuildDataManager.saveGuild(server, receiverGuild);
             GuildDataManager.saveGuild(server, requesterGuild);
-            player.sendMessage((Text)Text.literal((String)("You are now allied with " + requesterGuild.getName() + "!")).formatted(Formatting.GREEN), false);
+            player.sendMessage(GuildTexts.t("ally.accepted_receiver", requesterGuild.getName()).formatted(Formatting.GREEN), false);
             ServerPlayerEntity requesterMaster = server.getPlayerManager().getPlayer(requesterGuild.getOwnerId());
             if (requesterMaster != null) {
-                requesterMaster.sendMessage((Text)Text.literal((String)("Your alliance request was accepted by " + receiverGuild.getName() + "!")).formatted(Formatting.GREEN), false);
+                requesterMaster.sendMessage(GuildTexts.t("ally.accepted_requester", receiverGuild.getName()).formatted(Formatting.GREEN), false);
             }
             return 1;
         })))).then(CommandManager.literal((String)"allydeny").then(CommandManager.argument((String)"guildId", (ArgumentType)StringArgumentType.word()).suggests((ctx, builder) -> {
@@ -848,33 +853,33 @@ public class GuildCommand {
                 requesterGuildId = UUID.fromString(guildIdStr);
             }
             catch (IllegalArgumentException e) {
-                source.sendError((Text)Text.literal((String)"Invalid guild ID format."));
+                source.sendError(GuildTexts.t("error.invalid_guild_id"));
                 return 0;
             }
             Guild receiverGuild = GuildDataManager.getGuildByPlayer(playerId);
             if (receiverGuild == null) {
-                source.sendError((Text)Text.literal((String)"You are not in a guild."));
+                source.sendError(GuildTexts.t("error.not_in_guild"));
                 return 0;
             }
             if (!receiverGuild.getOwnerId().equals(playerId)) {
-                source.sendError((Text)Text.literal((String)"Only the guild master can deny alliance requests."));
+                source.sendError(GuildTexts.t("error.ally_deny_not_master"));
                 return 0;
             }
             UUID expected = GuildDataManager.getAllyRequest(playerId);
             if (!requesterGuildId.equals(expected)) {
-                source.sendError((Text)Text.literal((String)"You have no pending alliance request from that guild."));
+                source.sendError(GuildTexts.t("error.ally_deny_no_pending"));
                 return 0;
             }
             Guild senderGuild = GuildDataManager.getGuildById(requesterGuildId);
             if (senderGuild == null) {
-                source.sendError((Text)Text.literal((String)"That guild does not exist."));
+                source.sendError(GuildTexts.t("error.ally_guild_missing"));
                 return 0;
             }
             GuildDataManager.removeAllyRequest(playerId);
-            player.sendMessage((Text)Text.literal((String)"You have denied the alliance request from ").append((Text)Text.literal((String)senderGuild.getName()).formatted(Formatting.RED)));
+            player.sendMessage(GuildTexts.t("ally.denied_receiver_prefix").append(Text.literal(senderGuild.getName()).formatted(Formatting.RED)));
             ServerPlayerEntity senderPlayer = server.getPlayerManager().getPlayer(senderGuild.getOwnerId());
             if (senderPlayer != null) {
-                senderPlayer.sendMessage((Text)Text.literal((String)"Your alliance request to ").append((Text)Text.literal((String)receiverGuild.getName()).formatted(Formatting.RED)).append((Text)Text.literal((String)" was denied.")));
+                senderPlayer.sendMessage(GuildTexts.t("ally.denied_sender_prefix").append(Text.literal(receiverGuild.getName()).formatted(Formatting.RED)).append(GuildTexts.t("ally.denied_sender_suffix")));
             }
             return 1;
         })))).then(CommandManager.literal((String)"allyrevoke").then(CommandManager.argument((String)"guildId", (ArgumentType)StringArgumentType.word()).suggests((ctx, builder) -> {
@@ -896,15 +901,15 @@ public class GuildCommand {
             String shortId = StringArgumentType.getString((CommandContext)ctx, (String)"guildId");
             Guild selfGuild = GuildDataManager.getGuildByPlayer(playerId);
             if (selfGuild == null) {
-                source.sendError((Text)Text.literal((String)"You are not in a guild."));
+                source.sendError(GuildTexts.t("error.not_in_guild"));
                 return 0;
             }
             if (!selfGuild.getOwnerId().equals(playerId)) {
-                source.sendError((Text)Text.literal((String)"Only the guild master can revoke alliances."));
+                source.sendError(GuildTexts.t("error.ally_revoke_not_master"));
                 return 0;
             }
             if (!selfGuild.getAllies().containsKey(shortId)) {
-                source.sendError((Text)Text.literal((String)"You are not currently allied with that guild."));
+                source.sendError(GuildTexts.t("error.ally_not_allied"));
                 return 0;
             }
             Guild targetGuild = null;
@@ -914,7 +919,7 @@ public class GuildCommand {
                 break;
             }
             if (targetGuild == null) {
-                source.sendError((Text)Text.literal((String)"The target guild could not be found."));
+                source.sendError(GuildTexts.t("error.ally_target_missing"));
                 return 0;
             }
             selfGuild.getAllies().remove(shortId);
@@ -923,10 +928,10 @@ public class GuildCommand {
             GuildDataManager.saveGuild(server, selfGuild);
             GuildDataManager.saveGuild(server, targetGuild);
             AllyChatBridgeManager.removeBridge(selfShortId, shortId);
-            player.sendMessage((Text)Text.literal((String)"You have revoked your alliance with ").append((Text)Text.literal((String)targetGuild.getName()).formatted(Formatting.RED)));
+            player.sendMessage(GuildTexts.t("ally.revoked_self_prefix").append(Text.literal(targetGuild.getName()).formatted(Formatting.RED)));
             ServerPlayerEntity targetOwner = server.getPlayerManager().getPlayer(targetGuild.getOwnerId());
             if (targetOwner != null) {
-                targetOwner.sendMessage((Text)Text.literal((String)(selfGuild.getName() + " has revoked their alliance with your guild.")).formatted(Formatting.GRAY));
+                targetOwner.sendMessage(GuildTexts.t("ally.revoked_notice_target", selfGuild.getName()).formatted(Formatting.GRAY));
             }
             return 1;
         })))).then(CommandManager.literal((String)"bank").then(CommandManager.argument((String)"page", (ArgumentType)IntegerArgumentType.integer((int)1)).executes(context -> {
@@ -934,41 +939,41 @@ public class GuildCommand {
             ServerCommandSource source = (ServerCommandSource)context.getSource();
             ServerPlayerEntity player = source.getPlayer();
             if (player == null) {
-                source.sendError((Text)Text.literal((String)"Command can only be run by a player."));
+                source.sendError(GuildTexts.t("error.players_only_command"));
                 return 0;
             }
             final Guild guild = GuildDataManager.getGuildByPlayer(player.getUuid());
             if (guild == null) {
-                player.sendMessage((Text)Text.literal((String)"You must be in a guild to use this command!"), false);
+                player.sendMessage(GuildTexts.t("error.bank_need_guild"), false);
                 return 0;
             }
             final int requestedPage = IntegerArgumentType.getInteger((CommandContext)context, (String)"page");
             if (requestedPage > (unlockedTabs = guild.getUnlockedBankTabs())) {
-                player.sendMessage((Text)Text.literal((String)("\u00a7cBank Tab " + requestedPage + " is locked. Donate more Netherite to unlock it!")), false);
+                player.sendMessage(GuildTexts.t("bank.tab_locked", requestedPage).formatted(Formatting.RED), false);
                 return 0;
             }
             String permissionKey = "canUseBankTab" + requestedPage;
             if (!guild.hasRankPermission(player.getUuid(), permissionKey)) {
-                source.sendError((Text)Text.literal((String)"You do not have permission to access this bank page."));
+                source.sendError(GuildTexts.t("error.bank_no_permission"));
                 return 0;
             }
             final List<GuildBankInventory> guildBankPages = GuildBankManager.getOrLoadBankPages(player.getServer(), guild.getShortenedId());
             if (requestedPage < 1 || requestedPage > guildBankPages.size()) {
-                player.sendMessage((Text)Text.literal((String)("Invalid page number. Please request a page between 1 and " + guildBankPages.size() + ".")), false);
+                player.sendMessage(GuildTexts.t("bank.invalid_page", guildBankPages.size()), false);
                 return 0;
             }
             final int startingPageIndex = requestedPage - 1;
             player.openHandledScreen(new NamedScreenHandlerFactory(){
 
                 public Text getDisplayName() {
-                    return Text.literal((String)(guild.getName() + " Guild Bank (Page " + requestedPage + ")"));
+                    return GuildTexts.t("bank.screen_title", guild.getName(), requestedPage);
                 }
 
                 public GuildBankScreenHandler createMenu(int syncId, PlayerInventory playerInventory, PlayerEntity playerEntity) {
                     return new GuildBankScreenHandler(syncId, playerInventory, guildBankPages, startingPageIndex);
                 }
             });
-            player.sendMessage((Text)Text.literal((String)("Opened guild bank page " + requestedPage + ".")), false);
+            player.sendMessage(GuildTexts.t("bank.opened_page", requestedPage), false);
             return 1;
         })))).then(CommandManager.literal((String)"permissions").executes(ctx -> {
             ServerCommandSource source = (ServerCommandSource)ctx.getSource();
@@ -976,12 +981,12 @@ public class GuildCommand {
             Guild guild = GuildDataManager.getGuildByPlayer(player.getUuid());
             if (guild == null) {
                 System.out.println("[GuildsRemastered] /guild permissions failed: player not in a guild (" + player.getName().getString() + ")");
-                source.sendError((Text)Text.literal((String)"You are not in a guild."));
+                source.sendError(GuildTexts.t("error.not_in_guild"));
                 return 0;
             }
             if (!guild.getOwnerId().equals(player.getUuid())) {
                 System.out.println("[GuildsRemastered] /guild permissions failed: player not guild master (" + player.getName().getString() + ")");
-                source.sendError((Text)Text.literal((String)"Only the guild master can open the permissions menu."));
+                source.sendError(GuildTexts.t("error.permissions_not_master"));
                 return 0;
             }
             try {
@@ -992,7 +997,7 @@ public class GuildCommand {
             catch (Exception e) {
                 System.out.println("[GuildsRemastered] ERROR: Failed to open guild permissions menu for " + player.getName().getString());
                 e.printStackTrace();
-                source.sendError((Text)Text.literal((String)"An unexpected error occurred opening the permissions menu. Please report this to an admin."));
+                source.sendError(GuildTexts.t("error.permissions_open_failed"));
                 return 0;
             }
         }))).then(CommandManager.literal((String)"donate").executes(ctx -> {
@@ -1002,28 +1007,28 @@ public class GuildCommand {
             MinecraftServer server = source.getServer();
             Guild guild = GuildDataManager.getGuildByPlayer(player.getUuid());
             if (guild == null) {
-                source.sendError((Text)Text.literal((String)"\u00a7cYou are not in a guild."));
+                source.sendError(GuildTexts.t("error.not_in_guild").formatted(Formatting.RED));
                 return 0;
             }
             if (!guild.hasRankPermission(player.getUuid(), "canDonate")) {
-                source.sendError((Text)Text.literal((String)"\u00a7cYou do not have permission to donate Netherite for your guild."));
+                source.sendError(GuildTexts.t("error.donate_no_permission").formatted(Formatting.RED));
                 return 0;
             }
             ItemStack hand = player.getMainHandStack();
             if (!hand.isOf(Items.NETHERITE_INGOT)) {
-                source.sendError((Text)Text.literal((String)"\u00a7cYou must hold Netherite Ingots in your main hand to donate."));
+                source.sendError(GuildTexts.t("error.donate_need_ingot").formatted(Formatting.RED));
                 return 0;
             }
             int held = hand.getCount();
             int nextTab = guild.getUnlockedBankTabs() + 1;
             if (nextTab > 9) {
-                source.sendError((Text)Text.literal((String)"\u00a7eYour guild has already unlocked all 9 bank tabs."));
+                source.sendError(GuildTexts.t("error.donate_all_unlocked").formatted(Formatting.YELLOW));
                 return 0;
             }
             int cost = GuildCommand.getRequiredNetheriteForTab(nextTab);
             int needed = cost - (currentProgress = guild.getBankUnlockProgress(nextTab));
             if (needed <= 0) {
-                source.sendError((Text)Text.literal((String)("\u00a7aTab " + nextTab + " is already unlocked or ready to unlock.")));
+                source.sendError(GuildTexts.t("error.donate_tab_ready", nextTab).formatted(Formatting.GREEN));
                 return 0;
             }
             int toDeposit = Math.min(held, needed);
@@ -1031,7 +1036,7 @@ public class GuildCommand {
             hand.decrement(toDeposit);
             player.setStackInHand(player.getActiveHand(), hand);
             GuildDataManager.saveGuild(server, guild);
-            player.sendMessage((Text)Text.literal((String)("\u00a77Donated " + toDeposit + " Netherite Ingot(s) toward unlocking Bank Tab " + nextTab + ".")), false);
+            player.sendMessage(GuildTexts.t("donate.progress_message", toDeposit, nextTab).formatted(Formatting.GRAY), false);
             int newProgress = guild.getBankUnlockProgress(nextTab);
             if (newProgress >= cost) {
                 guild.setUnlockedBankTabs(nextTab);
@@ -1039,7 +1044,7 @@ public class GuildCommand {
                 for (UUID memberId : guild.getMembers().keySet()) {
                     ServerPlayerEntity member = server.getPlayerManager().getPlayer(memberId);
                     if (member == null) continue;
-                    member.sendMessage((Text)Text.literal((String)("\u00a7aYour guild has unlocked Bank Tab " + nextTab + "!")).formatted(Formatting.GREEN));
+                    member.sendMessage(GuildTexts.t("donate.tab_unlocked_broadcast", nextTab).formatted(Formatting.GREEN));
                 }
             }
             return 1;
@@ -1047,31 +1052,31 @@ public class GuildCommand {
             ServerCommandSource source = (ServerCommandSource)context.getSource();
             ServerPlayerEntity player = source.getPlayer();
             if (player == null) {
-                source.sendError((Text)Text.literal((String)"Only players can run this command."));
+                source.sendError(GuildTexts.t("error.players_only_progress"));
                 return 0;
             }
             Guild guild = GuildDataManager.getGuildByPlayer(player.getUuid());
             if (guild == null) {
-                source.sendError((Text)Text.literal((String)"You are not in a guild."));
+                source.sendError(GuildTexts.t("error.not_in_guild"));
                 return 0;
             }
             int unlocked = guild.getUnlockedBankTabs();
             if (unlocked >= 9) {
-                player.sendMessage((Text)Text.literal((String)"\u00a76Guild Bank Progress:").append((Text)Text.literal((String)"\n\u00a7aYour guild has already unlocked all 9 bank pages!")), false);
+                player.sendMessage(GuildTexts.t("bank.progress_header_gold").formatted(Formatting.GOLD).append(GuildTexts.t("bank.progress_all_done").formatted(Formatting.GREEN)), false);
                 return 1;
             }
             int nextTab = unlocked + 1;
             int required = guild.getRequiredNetheriteForTab(nextTab);
             int progress = guild.getNetheriteDonatedForTab(nextTab);
             int remaining = Math.max(0, required - progress);
-            player.sendMessage((Text)Text.literal((String)"\u00a76Guild Bank Progress:").append((Text)Text.literal((String)("\n\u00a7ePage " + nextTab + " requires \u00a7f" + required + " Netherite Ingots"))).append((Text)Text.literal((String)("\n\u00a77Progress: \u00a7e" + progress + " / " + required))).append((Text)Text.literal((String)("\n\u00a7a" + remaining + " more needed to unlock!"))), false);
+            player.sendMessage(GuildTexts.t("bank.progress_header_gold").formatted(Formatting.GOLD).append(GuildTexts.t("bank.progress_line_require", nextTab, required).formatted(Formatting.YELLOW)).append(GuildTexts.t("bank.progress_line_numbers", progress, required).formatted(Formatting.GRAY)).append(GuildTexts.t("bank.progress_line_remaining", remaining).formatted(Formatting.GREEN)), false);
             return 1;
         }))).then(CommandManager.literal((String)"unlock").executes(context -> {
             ServerCommandSource source = (ServerCommandSource)context.getSource();
             ServerPlayerEntity executor = source.getPlayer();
             Guild guild = GuildDataManager.getGuildByPlayer(executor.getUuid());
             if (guild == null) {
-                source.sendError((Text)Text.literal((String)"You must be in a guild to unlock a bank tab."));
+                source.sendError(GuildTexts.t("error.unlock_need_guild"));
                 return 0;
             }
             int nextTab = guild.getUnlockedBankTabs() + 1;
@@ -1079,14 +1084,14 @@ public class GuildCommand {
             int currentDonated = guild.getBankUnlockProgress(nextTab);
             if (currentDonated < requiredNetherite) {
                 int remainingAmount = requiredNetherite - currentDonated;
-                source.sendError((Text)Text.literal((String)("You still need " + remainingAmount + " Netherite to unlock bank tab " + nextTab + ".")));
+                source.sendError(GuildTexts.t("error.unlock_need_more", remainingAmount, nextTab));
                 return 0;
             }
             guild.setUnlockedBankTabs(nextTab);
-            source.sendFeedback(() -> Text.literal((String)("Successfully unlocked bank tab " + nextTab + ".")), false);
+            source.sendFeedback(() -> GuildTexts.t("unlock.success", nextTab), false);
             return 1;
         }))).then(CommandManager.literal((String)"cancel").executes(ctx -> {
-            ((ServerCommandSource)ctx.getSource()).getPlayer().sendMessage((Text)Text.literal((String)"Action cancelled.").formatted(Formatting.GRAY));
+            ((ServerCommandSource)ctx.getSource()).getPlayer().sendMessage(GuildTexts.t("common.action_cancelled").formatted(Formatting.GRAY));
             return 1;
         })));
     }
@@ -1098,17 +1103,17 @@ public class GuildCommand {
 
     private static void displayGuildInfo(MinecraftServer server, ServerCommandSource source, Guild guild) {
         Formatting guildColor = GuildColorUtil.getFormatting(guild.getColor());
-        source.sendMessage((Text)Text.literal((String)"Guild: ").append((Text)Text.literal((String)guild.getName()).formatted(guildColor)));
+        source.sendMessage(GuildTexts.t("info.guild_label").append(Text.literal(guild.getName()).formatted(guildColor)));
         if (guild.getMotd() != null && !guild.getMotd().isEmpty()) {
-            source.sendMessage((Text)Text.literal((String)"MOTD: ").append((Text)Text.literal((String)guild.getMotd()).styled(style -> style.withColor(guildColor).withItalic(Boolean.valueOf(true)))));
+            source.sendMessage(GuildTexts.t("info.motd_label").append(Text.literal(guild.getMotd()).styled(style -> style.withColor(guildColor).withItalic(Boolean.valueOf(true)))));
         }
         boolean hasHome = guild.hasHome();
-        MutableText homeLine = Text.literal((String)"Guild Home Set: ").formatted(Formatting.AQUA);
-        homeLine.append(Text.literal((String)String.valueOf(hasHome)).formatted(hasHome ? Formatting.GREEN : Formatting.RED));
+        MutableText homeLine = GuildTexts.t("info.home_set_label").formatted(Formatting.AQUA);
+        homeLine.append(Text.literal(String.valueOf(hasHome)).formatted(hasHome ? Formatting.GREEN : Formatting.RED));
         source.sendMessage((Text)homeLine);
-        source.sendMessage((Text)Text.literal((String)"Created: ").append((Text)Text.literal((String)guild.getFormattedDate()).formatted(Formatting.WHITE)));
-        source.sendMessage((Text)Text.literal((String)"Guild Master: ").append((Text)Text.literal((String)guild.getOwnerName()).formatted(Formatting.AQUA)));
-        source.sendMessage((Text)Text.literal((String)("Members (" + guild.getMembers().size() + "):")));
+        source.sendMessage(GuildTexts.t("info.created_label").append(Text.literal(guild.getFormattedDate()).formatted(Formatting.WHITE)));
+        source.sendMessage(GuildTexts.t("info.master_label").append(Text.literal(guild.getOwnerName()).formatted(Formatting.AQUA)));
+        source.sendMessage(GuildTexts.t("info.members_header", guild.getMembers().size()));
         ArrayList<String> online = new ArrayList<String>();
         ArrayList<String> offline = new ArrayList<String>();
         for (Map.Entry<UUID, Guild.GuildMemberInfo> entry : guild.getMembers().entrySet()) {
@@ -1123,33 +1128,33 @@ public class GuildCommand {
             offline.add(display);
         }
         if (!online.isEmpty()) {
-            source.sendMessage((Text)Text.literal((String)"Online:").formatted(Formatting.GREEN));
+            source.sendMessage(GuildTexts.t("info.online_header").formatted(Formatting.GREEN));
             for (String string : online) {
-                source.sendMessage((Text)Text.literal((String)string).formatted(Formatting.GREEN));
+                source.sendMessage(Text.literal(string).formatted(Formatting.GREEN));
             }
         }
         if (!offline.isEmpty()) {
-            source.sendMessage((Text)Text.literal((String)"Offline:").formatted(Formatting.RED));
+            source.sendMessage(GuildTexts.t("info.offline_header").formatted(Formatting.RED));
             for (String string : offline) {
-                source.sendMessage((Text)Text.literal((String)string).formatted(Formatting.RED));
+                source.sendMessage(Text.literal(string).formatted(Formatting.RED));
             }
         }
         if (!guild.getAllies().isEmpty()) {
             Collection<Guild.AllyInfo> allyInfos = guild.getAllies().values();
-            MutableText alliesLine = Text.literal((String)"Allies: ").formatted(Formatting.AQUA);
+            MutableText alliesLine = GuildTexts.t("info.allies_header").formatted(Formatting.AQUA);
             boolean first = true;
             for (Guild.AllyInfo ally : allyInfos) {
                 if (!first) {
-                    alliesLine.append((Text)Text.literal((String)", ").formatted(Formatting.GRAY));
+                    alliesLine.append(Text.literal(", ").formatted(Formatting.GRAY));
                 }
-                MutableText nameText = Text.literal((String)ally.name).formatted(Formatting.GREEN);
-                nameText = ally.pvpDisabled ? nameText.append((Text)Text.literal((String)" (PvP Off)").formatted(Formatting.RED)) : nameText.append((Text)Text.literal((String)" (PvP On)").formatted(Formatting.DARK_GREEN));
+                MutableText nameText = Text.literal(ally.name).formatted(Formatting.GREEN);
+                nameText = ally.pvpDisabled ? nameText.append(GuildTexts.t("info.ally_pvp_off").formatted(Formatting.RED)) : nameText.append(GuildTexts.t("info.ally_pvp_on").formatted(Formatting.DARK_GREEN));
                 alliesLine.append((Text)nameText);
                 first = false;
             }
             source.sendMessage((Text)alliesLine);
         } else {
-            MutableText noAllies = Text.literal((String)"").append((Text)Text.literal((String)"Allies: ").formatted(Formatting.AQUA)).append((Text)Text.literal((String)"N/A").formatted(Formatting.RED));
+            MutableText noAllies = Text.empty().append(GuildTexts.t("info.allies_header").formatted(Formatting.AQUA)).append(GuildTexts.t("info.allies_none").formatted(Formatting.RED));
             source.sendMessage((Text)noAllies);
         }
     }

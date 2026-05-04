@@ -22,6 +22,7 @@
 package com.dahuzhou.dahuzhouguilds.util;
 
 import java.util.List;
+import com.dahuzhou.dahuzhouguilds.GuildTexts;
 import com.dahuzhou.dahuzhouguilds.util.GuildBankRankEditorMenu;
 import com.dahuzhou.dahuzhouguilds.util.GuildMembersMenu;
 import com.dahuzhou.dahuzhouguilds.util.GuildRankEditorMenu;
@@ -35,14 +36,30 @@ import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.Items;
 import net.minecraft.item.ItemConvertible;
+import net.minecraft.text.MutableText;
 import net.minecraft.text.Text;
+import net.minecraft.util.Formatting;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.screen.NamedScreenHandlerFactory;
 import net.minecraft.screen.ScreenHandlerType;
 import net.minecraft.screen.SimpleNamedScreenHandlerFactory;
 
 public class GuildPermissionsMenu {
-    public static final List<PositionedMenuItem> MENU_ITEMS = List.of(new PositionedMenuItem(10, GuildPermissionsMenu.menuItem(Items.BOOK, "\u00a7eGuild Info", "/guild info")), new PositionedMenuItem(12, GuildPermissionsMenu.menuItem(Items.CHEST, "\u00a7bGuild Bank", "/guild bank 1")), new PositionedMenuItem(14, GuildPermissionsMenu.menuItem(Items.WHITE_BED, "\u00a7dSet Guild Home", "/guild sethome")), new PositionedMenuItem(16, GuildPermissionsMenu.menuItem(Items.ORANGE_DYE, "\u00a76Toggle Friendly Fire", "/guild toggle_friendlyfire")), new PositionedMenuItem(28, GuildPermissionsMenu.menuItem(Items.PLAYER_HEAD, "\u00a7aManage Members", null)), new PositionedMenuItem(30, GuildPermissionsMenu.menuItem(Items.WRITABLE_BOOK, "\u00a7bEdit Ranks", null)), new PositionedMenuItem(32, GuildPermissionsMenu.menuItem(Items.ENDER_CHEST, "\u00a79Bank Permissions", null)), new PositionedMenuItem(34, GuildPermissionsMenu.menuItem(Items.BARRIER, "\u00a7cDisband Guild", "/guild disband")));
+    public static final List<PositionedMenuItem> MENU_ITEMS = List.of(
+			new PositionedMenuItem(10, GuildPermissionsMenu.menuItem(Items.BOOK, GuildTexts.t("menu.entry.guild_info").formatted(Formatting.YELLOW), "/guild info")),
+			new PositionedMenuItem(12, GuildPermissionsMenu.menuItem(Items.CHEST, GuildTexts.t("menu.entry.guild_bank").formatted(Formatting.AQUA), "/guild bank 1")),
+			new PositionedMenuItem(14, GuildPermissionsMenu.menuItem(Items.WHITE_BED, GuildTexts.t("menu.entry.set_guild_home").formatted(Formatting.LIGHT_PURPLE), "/guild sethome")),
+			new PositionedMenuItem(16, GuildPermissionsMenu.menuItem(Items.ORANGE_DYE, GuildTexts.t("menu.entry.toggle_friendly_fire").formatted(Formatting.GOLD), "/guild toggle_friendlyfire")),
+			new PositionedMenuItem(28, GuildPermissionsMenu.menuItem(Items.PLAYER_HEAD, GuildTexts.t("menu.entry.manage_members").formatted(Formatting.GREEN), null)),
+			new PositionedMenuItem(30, GuildPermissionsMenu.menuItem(Items.WRITABLE_BOOK, GuildTexts.t("menu.entry.edit_ranks").formatted(Formatting.AQUA), null)),
+			new PositionedMenuItem(32, GuildPermissionsMenu.menuItem(Items.ENDER_CHEST, GuildTexts.t("menu.entry.bank_permissions").formatted(Formatting.BLUE), null)),
+			new PositionedMenuItem(34, GuildPermissionsMenu.menuItem(Items.BARRIER, GuildTexts.t("menu.entry.disband_guild").formatted(Formatting.RED), "/guild disband")));
+
+	public static MenuItem menuItem(Item item, MutableText displayName, String command) {
+		ItemStack stack = new ItemStack((ItemConvertible)item);
+		stack.setCustomName(displayName);
+		return new MenuItem(stack, command);
+	}
 
     public static MenuItem menuItem(Item item, String displayName, String command) {
         ItemStack stack = new ItemStack((ItemConvertible)item);
@@ -57,7 +74,7 @@ public class GuildPermissionsMenu {
             if (pm.slot < 0 || pm.slot >= size) continue;
             inventory.setStack(pm.slot, pm.item.icon.copy());
         }
-        player.openHandledScreen((NamedScreenHandlerFactory)new SimpleNamedScreenHandlerFactory((syncId, playerInv, playerEntity) -> new GuildPermissionsMenuHandler(syncId, playerInv, inventory), (Text)Text.literal((String)"Guild Menu")));
+        player.openHandledScreen((NamedScreenHandlerFactory)new SimpleNamedScreenHandlerFactory((syncId, playerInv, playerEntity) -> new GuildPermissionsMenuHandler(syncId, playerInv, inventory), GuildTexts.t("menu.main_title")));
     }
 
     public static class MenuItem {

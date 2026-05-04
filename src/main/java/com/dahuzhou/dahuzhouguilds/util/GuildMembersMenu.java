@@ -29,6 +29,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
+import com.dahuzhou.dahuzhouguilds.GuildTexts;
 import com.dahuzhou.dahuzhouguilds.data.GuildDataManager;
 import com.dahuzhou.dahuzhouguilds.guild.Guild;
 import com.dahuzhou.dahuzhouguilds.util.GuildMemberManageMenu;
@@ -44,6 +45,7 @@ import net.minecraft.item.ItemStack;
 import net.minecraft.item.Items;
 import net.minecraft.item.ItemConvertible;
 import net.minecraft.text.Text;
+import net.minecraft.util.Formatting;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.screen.NamedScreenHandlerFactory;
 import net.minecraft.screen.ScreenHandlerType;
@@ -72,7 +74,7 @@ public class GuildMembersMenu {
     public static void openForPlayer(ServerPlayerEntity player, int page) {
         Guild guild = GuildDataManager.getGuildByPlayer(player.getUuid());
         if (guild == null) {
-            player.sendMessage((Text)Text.literal((String)"\u00a7cYou are not in a guild."), false);
+            player.sendMessage(GuildTexts.t("error.not_in_guild").formatted(Formatting.RED), false);
             return;
         }
         ArrayList<UUID> memberIds = new ArrayList<UUID>(guild.getMembers().keySet());
@@ -93,10 +95,10 @@ public class GuildMembersMenu {
             String name = guild.getMembers().get((Object)memberId).name;
             inventory.setStack(MEMBER_SLOTS[i], GuildMembersMenu.getPlayerHead(Objects.requireNonNull(player.getServer()), memberId, name));
         }
-        inventory.setStack(45, GuildPermissionsMenu.menuItem((Item)Items.ARROW, (String)(currentPage > 0 ? "\u00a7a\u2190 Prev Page" : "\u00a77\u2190 Prev Page"), null).icon.copy());
-        inventory.setStack(49, GuildPermissionsMenu.menuItem((Item)Items.BARRIER, (String)"\u00a7cBack", null).icon.copy());
-        inventory.setStack(53, GuildPermissionsMenu.menuItem((Item)Items.ARROW, (String)(currentPage + 1 < totalPages ? "\u00a7aNext Page \u2192" : "\u00a77Next Page \u2192"), null).icon.copy());
-        player.openHandledScreen((NamedScreenHandlerFactory)new SimpleNamedScreenHandlerFactory((syncId, playerInv, playerEntity) -> new GuildMembersMenuHandler(syncId, playerInv, inventory, memberIds, currentPage), (Text)Text.literal((String)("Guild Members (Page " + (currentPage + 1) + "/" + Math.max(totalPages, 1) + ")"))));
+        inventory.setStack(45, GuildPermissionsMenu.menuItem((Item)Items.ARROW, currentPage > 0 ? GuildTexts.t("menu.members.prev_active").formatted(Formatting.GREEN) : GuildTexts.t("menu.members.prev_inactive").formatted(Formatting.GRAY), null).icon.copy());
+        inventory.setStack(49, GuildPermissionsMenu.menuItem((Item)Items.BARRIER, GuildTexts.t("menu.members.back").formatted(Formatting.RED), null).icon.copy());
+        inventory.setStack(53, GuildPermissionsMenu.menuItem((Item)Items.ARROW, currentPage + 1 < totalPages ? GuildTexts.t("menu.members.next_active").formatted(Formatting.GREEN) : GuildTexts.t("menu.members.next_inactive").formatted(Formatting.GRAY), null).icon.copy());
+        player.openHandledScreen((NamedScreenHandlerFactory)new SimpleNamedScreenHandlerFactory((syncId, playerInv, playerEntity) -> new GuildMembersMenuHandler(syncId, playerInv, inventory, memberIds, currentPage), GuildTexts.t("menu.members.title", currentPage + 1, Math.max(totalPages, 1))));
     }
 
     public static class GuildMembersMenuHandler

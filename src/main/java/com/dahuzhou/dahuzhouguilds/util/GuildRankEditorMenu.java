@@ -23,6 +23,7 @@ package com.dahuzhou.dahuzhouguilds.util;
 
 import java.util.HashMap;
 import java.util.Map;
+import com.dahuzhou.dahuzhouguilds.GuildTexts;
 import com.dahuzhou.dahuzhouguilds.util.GuildPermissionsMenu;
 import com.dahuzhou.dahuzhouguilds.util.GuildRankPermissionsMenu;
 import net.minecraft.inventory.Inventory;
@@ -36,6 +37,7 @@ import net.minecraft.item.ItemStack;
 import net.minecraft.item.Items;
 import net.minecraft.item.ItemConvertible;
 import net.minecraft.text.Text;
+import net.minecraft.util.Formatting;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.screen.NamedScreenHandlerFactory;
 import net.minecraft.screen.ScreenHandlerType;
@@ -73,17 +75,17 @@ public class GuildRankEditorMenu {
     public static void openForPlayer(ServerPlayerEntity player) {
         int size = 27;
         SimpleInventory inventory = new SimpleInventory(size);
-        inventory.setStack(10, GuildRankEditorMenu.rankItem("Guild Master", Items.NETHER_STAR));
-        inventory.setStack(12, GuildRankEditorMenu.rankItem("Officer", Items.GOLD_INGOT));
-        inventory.setStack(14, GuildRankEditorMenu.rankItem("Member", Items.ORANGE_DYE));
-        inventory.setStack(16, GuildRankEditorMenu.rankItem("Initiate", Items.IRON_INGOT));
-        inventory.setStack(26, GuildPermissionsMenu.menuItem((Item)Items.ARROW, (String)"Back", null).icon.copy());
-        player.openHandledScreen((NamedScreenHandlerFactory)new SimpleNamedScreenHandlerFactory((syncId, playerInv, playerEntity) -> new GuildRankEditorMenuHandler(syncId, playerInv, inventory), (Text)Text.literal((String)"Guild Rank Editor")));
+        inventory.setStack(10, GuildRankEditorMenu.rankItem(GuildTexts.t("menu.rank.guild_master"), Items.NETHER_STAR));
+        inventory.setStack(12, GuildRankEditorMenu.rankItem(GuildTexts.t("menu.rank.officer"), Items.GOLD_INGOT));
+        inventory.setStack(14, GuildRankEditorMenu.rankItem(GuildTexts.t("menu.rank.member"), Items.ORANGE_DYE));
+        inventory.setStack(16, GuildRankEditorMenu.rankItem(GuildTexts.t("menu.rank.initiate"), Items.IRON_INGOT));
+        inventory.setStack(26, GuildPermissionsMenu.menuItem((Item)Items.ARROW, GuildTexts.t("menu.back").formatted(Formatting.GRAY), null).icon.copy());
+        player.openHandledScreen((NamedScreenHandlerFactory)new SimpleNamedScreenHandlerFactory((syncId, playerInv, playerEntity) -> new GuildRankEditorMenuHandler(syncId, playerInv, inventory), GuildTexts.t("menu.rank_editor.title")));
     }
 
-    public static ItemStack rankItem(String rankName, Item icon) {
+    public static ItemStack rankItem(Text rankLabel, Item icon) {
         ItemStack stack = new ItemStack((ItemConvertible)icon);
-        stack.setCustomName(Text.literal("\u00a7a" + rankName));
+        stack.setCustomName(rankLabel.copy().formatted(Formatting.GREEN));
         return stack;
     }
 
@@ -132,7 +134,7 @@ public class GuildRankEditorMenu {
                 }
                 if (rankName != null) {
                     if (rankName.equalsIgnoreCase("Guild Master")) {
-                        serverPlayer.sendMessage((Text)Text.literal((String)"You cannot modify the Guild Master's permissions."), false);
+                        serverPlayer.sendMessage(GuildTexts.t("menu.rank_editor.cannot_edit_master"), false);
                         return;
                     }
                     GuildRankPermissionsMenu.openForPlayer(serverPlayer, rankName);
