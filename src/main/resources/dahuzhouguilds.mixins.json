@@ -3,7 +3,9 @@
 	"package": "com.dahuzhou.dahuzhouguilds.mixin",
 	"compatibilityLevel": "JAVA_17",
 	"mixins": [
-		"ExampleMixin"
+		"AllyChatManagerMixin",
+		"GuildChatManagerMixin",
+		"LivingEntityDamageMixin"
 	],
 	"injectors": {
 		"defaultRequire": 1
