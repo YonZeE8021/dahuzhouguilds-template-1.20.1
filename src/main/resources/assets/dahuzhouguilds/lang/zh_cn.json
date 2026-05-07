@@ -46,6 +46,8 @@
   "dahuzhouguilds.error.ally_revoke_not_master": "只有公会长可以解除结盟。",
   "dahuzhouguilds.error.ally_not_allied": "你当前未与该公会结盟。",
   "dahuzhouguilds.error.ally_target_missing": "找不到目标公会。",
+  "dahuzhouguilds.error.feature_guild_bank_disabled": "本服务器未开启公会银行功能。",
+  "dahuzhouguilds.error.feature_guild_home_disabled": "本服务器未开启公会驻地功能。",
   "dahuzhouguilds.error.players_only_command": "该命令只能由玩家执行。",
   "dahuzhouguilds.error.bank_need_guild": "你必须在公会中才能使用此命令！",
   "dahuzhouguilds.error.bank_no_permission": "你没有权限访问该银行页。",

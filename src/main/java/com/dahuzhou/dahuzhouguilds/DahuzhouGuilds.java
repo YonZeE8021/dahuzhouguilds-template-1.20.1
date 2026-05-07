@@ -1,5 +1,6 @@
 package com.dahuzhou.dahuzhouguilds;
 
+import com.dahuzhou.dahuzhouguilds.GuildsConfig;
 import com.dahuzhou.dahuzhouguilds.GuildTexts;
 import com.dahuzhou.dahuzhouguilds.commands.AllyCommand;
 import com.dahuzhou.dahuzhouguilds.commands.GuildCommand;
@@ -58,10 +59,12 @@ public class DahuzhouGuilds implements ModInitializer {
 				ServerScoreboard scoreboard = server.getScoreboard();
 				Team team = scoreboard.getTeam(teamName);
 				String guildShortId = guild.getId().toString().substring(0, 8);
-				Path bankFilePath = GuildBankManager.getBankFilePath(server, guildShortId);
-				if (!Files.exists(bankFilePath)) {
-					GuildBankManager.createBank(server, guildShortId);
-					LOGGER.info("[GuildBank] Created new bank for guild: {}", guildShortId);
+				if (GuildsConfig.enableGuildBank) {
+					Path bankFilePath = GuildBankManager.getBankFilePath(server, guildShortId);
+					if (!Files.exists(bankFilePath)) {
+						GuildBankManager.createBank(server, guildShortId);
+						LOGGER.info("[GuildBank] Created new bank for guild: {}", guildShortId);
+					}
 				}
 				if (team != null) {
 					if (GuildsConfig.enableEssentialsCommandGuildPrefix) {
@@ -88,7 +91,7 @@ public class DahuzhouGuilds implements ModInitializer {
 				return;
 			}
 			Guild guild = GuildDataManager.getGuildByPlayer(player.getUuid());
-			if (guild != null) {
+			if (guild != null && GuildsConfig.enableGuildBank) {
 				GuildBankManager.getPlayerCurrentPage(player.getUuid());
 				List<GuildBankInventory> pages = GuildBankManager.getOrLoadBankPages(server, guild.getShortenedId());
 				GuildBankManager.saveAllPages(server, guild.getShortenedId(), pages);
@@ -107,8 +110,10 @@ public class DahuzhouGuilds implements ModInitializer {
 			for (Guild guild : GuildDataManager.getAllGuilds()) {
 				GuildDataManager.saveGuild(server, guild);
 			}
-			GuildBankManager.saveAll(server);
-			LOGGER.info("[{}] Guilds & banks saved successfully.", MOD_ID);
+			if (GuildsConfig.enableGuildBank) {
+				GuildBankManager.saveAll(server);
+			}
+			LOGGER.info("[{}] Guilds saved successfully.", MOD_ID);
 		});
 		ServerLifecycleEvents.SERVER_STARTED.register(server -> {
 			GuildDataManager.loadAllGuilds(server);
@@ -116,7 +121,9 @@ public class DahuzhouGuilds implements ModInitializer {
 			LOGGER.info("[{}] Reinitializing ally chat bridges...", MOD_ID);
 			for (Guild guild : GuildDataManager.getAllGuilds()) {
 				String shortIdA = guild.getShortenedId();
-				GuildBankManager.getOrLoadBankPages(server, shortIdA);
+				if (GuildsConfig.enableGuildBank) {
+					GuildBankManager.getOrLoadBankPages(server, shortIdA);
+				}
 				for (String shortIdB : guild.getAllies().keySet()) {
 					Guild allyGuild = GuildDataManager.getGuildByShortId(shortIdB);
 					if (allyGuild == null

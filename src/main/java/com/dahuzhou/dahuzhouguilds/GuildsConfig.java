@@ -24,6 +24,10 @@ public class GuildsConfig {
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
     public static boolean enableEssentialsCommandGuildPrefix = false;
     public static boolean enableHungerBoundIntegration = false;
+    /** 公会银行（/guild bank、捐献、解锁页、权限菜单中的银行项）。默认关闭。 */
+    public static boolean enableGuildBank = false;
+    /** 公会驻地（/guild sethome、/guild home 及菜单中的设家项）。默认关闭。 */
+    public static boolean enableGuildHome = false;
     public static int guildHomeTeleportDelaySeconds = 6;
     public static boolean cancelTeleportOnMove = true;
     public static boolean cancelTeleportOnDamage = true;
@@ -41,6 +45,12 @@ public class GuildsConfig {
             if (json.has("enable_HungerBound_Integration")) {
                 enableHungerBoundIntegration = json.get("enable_HungerBound_Integration").getAsBoolean();
             }
+            if (json.has("enable_Guild_Bank")) {
+                enableGuildBank = json.get("enable_Guild_Bank").getAsBoolean();
+            }
+            if (json.has("enable_Guild_Home")) {
+                enableGuildHome = json.get("enable_Guild_Home").getAsBoolean();
+            }
             if (json.has("guild_Home_Teleport_Delay_Seconds")) {
                 guildHomeTeleportDelaySeconds = json.get("guild_Home_Teleport_Delay_Seconds").getAsInt();
             }
@@ -57,6 +67,8 @@ public class GuildsConfig {
         }
         System.out.println("[GuildConfig] Loaded enable_Essentials_Command_Guild_Prefix = " + enableEssentialsCommandGuildPrefix);
         System.out.println("[GuildConfig] Loaded enable_HungerBound_Integration = " + enableHungerBoundIntegration);
+        System.out.println("[GuildConfig] Loaded enable_Guild_Bank = " + enableGuildBank);
+        System.out.println("[GuildConfig] Loaded enable_Guild_Home = " + enableGuildHome);
         System.out.println("[GuildConfig] Loaded guild_Home_Teleport_Delay_Seconds = " + guildHomeTeleportDelaySeconds);
     }
 
@@ -66,6 +78,8 @@ public class GuildsConfig {
             JsonObject json = new JsonObject();
             json.addProperty("enable_Essentials_Command_Guild_Prefix", Boolean.valueOf(enableEssentialsCommandGuildPrefix));
             json.addProperty("enable_HungerBound_Integration", Boolean.valueOf(enableHungerBoundIntegration));
+            json.addProperty("enable_Guild_Bank", Boolean.valueOf(enableGuildBank));
+            json.addProperty("enable_Guild_Home", Boolean.valueOf(enableGuildHome));
             json.addProperty("guild_Home_Teleport_Delay_Seconds", (Number)guildHomeTeleportDelaySeconds);
             json.addProperty("cancel_teleport_on_move", Boolean.valueOf(cancelTeleportOnMove));
             json.addProperty("cancel_teleport_on_damage", Boolean.valueOf(cancelTeleportOnDamage));

@@ -46,6 +46,8 @@
   "dahuzhouguilds.error.ally_revoke_not_master": "Only the guild master can revoke alliances.",
   "dahuzhouguilds.error.ally_not_allied": "You are not currently allied with that guild.",
   "dahuzhouguilds.error.ally_target_missing": "The target guild could not be found.",
+  "dahuzhouguilds.error.feature_guild_bank_disabled": "Guild bank is disabled on this server.",
+  "dahuzhouguilds.error.feature_guild_home_disabled": "Guild home is disabled on this server.",
   "dahuzhouguilds.error.players_only_command": "Command can only be run by a player.",
   "dahuzhouguilds.error.bank_need_guild": "You must be in a guild to use this command!",
   "dahuzhouguilds.error.bank_no_permission": "You do not have permission to access this bank page.",

@@ -129,8 +129,10 @@ public class GuildCommand {
             GuildDataManager.registerGuild(guild);
             GuildDataManager.saveGuild(source.getServer(), guild);
             String guildShortId = guild.getShortenedId();
-            GuildBankManager.createBank(source.getServer(), guildShortId);
-            System.out.println("[GuildBank] Created new bank for guild: " + guildShortId);
+            if (GuildsConfig.enableGuildBank) {
+                GuildBankManager.createBank(source.getServer(), guildShortId);
+                System.out.println("[GuildBank] Created new bank for guild: " + guildShortId);
+            }
             String teamName = "guild_" + guild.getId().toString().substring(0, 8);
             ServerScoreboard scoreboard = source.getServer().getScoreboard();
             Team team = scoreboard.getTeam(teamName);
@@ -695,6 +697,10 @@ public class GuildCommand {
             ServerCommandSource source = (ServerCommandSource)ctx.getSource();
             ServerPlayerEntity player = source.getPlayer();
             UUID playerId = player.getUuid();
+            if (!GuildsConfig.enableGuildHome) {
+                source.sendError(GuildTexts.t("error.feature_guild_home_disabled"));
+                return 0;
+            }
             Guild guild = GuildDataManager.getGuildByPlayer(playerId);
             if (guild == null) {
                 source.sendError(GuildTexts.t("error.not_in_guild"));
@@ -714,6 +720,10 @@ public class GuildCommand {
             ServerCommandSource source = (ServerCommandSource)ctx.getSource();
             ServerPlayerEntity player = source.getPlayer();
             UUID playerId = player.getUuid();
+            if (!GuildsConfig.enableGuildHome) {
+                source.sendError(GuildTexts.t("error.feature_guild_home_disabled"));
+                return 0;
+            }
             Guild guild = GuildDataManager.getGuildByPlayer(playerId);
             if (guild == null) {
                 source.sendError(GuildTexts.t("error.not_in_guild"));
@@ -942,6 +952,10 @@ public class GuildCommand {
                 source.sendError(GuildTexts.t("error.players_only_command"));
                 return 0;
             }
+            if (!GuildsConfig.enableGuildBank) {
+                source.sendError(GuildTexts.t("error.feature_guild_bank_disabled"));
+                return 0;
+            }
             final Guild guild = GuildDataManager.getGuildByPlayer(player.getUuid());
             if (guild == null) {
                 player.sendMessage(GuildTexts.t("error.bank_need_guild"), false);
@@ -1005,6 +1019,10 @@ public class GuildCommand {
             ServerCommandSource source = (ServerCommandSource)ctx.getSource();
             ServerPlayerEntity player = source.getPlayer();
             MinecraftServer server = source.getServer();
+            if (!GuildsConfig.enableGuildBank) {
+                source.sendError(GuildTexts.t("error.feature_guild_bank_disabled"));
+                return 0;
+            }
             Guild guild = GuildDataManager.getGuildByPlayer(player.getUuid());
             if (guild == null) {
                 source.sendError(GuildTexts.t("error.not_in_guild").formatted(Formatting.RED));
@@ -1055,6 +1073,10 @@ public class GuildCommand {
                 source.sendError(GuildTexts.t("error.players_only_progress"));
                 return 0;
             }
+            if (!GuildsConfig.enableGuildBank) {
+                source.sendError(GuildTexts.t("error.feature_guild_bank_disabled"));
+                return 0;
+            }
             Guild guild = GuildDataManager.getGuildByPlayer(player.getUuid());
             if (guild == null) {
                 source.sendError(GuildTexts.t("error.not_in_guild"));
@@ -1074,6 +1096,10 @@ public class GuildCommand {
         }))).then(CommandManager.literal((String)"unlock").executes(context -> {
             ServerCommandSource source = (ServerCommandSource)context.getSource();
             ServerPlayerEntity executor = source.getPlayer();
+            if (!GuildsConfig.enableGuildBank) {
+                source.sendError(GuildTexts.t("error.feature_guild_bank_disabled"));
+                return 0;
+            }
             Guild guild = GuildDataManager.getGuildByPlayer(executor.getUuid());
             if (guild == null) {
                 source.sendError(GuildTexts.t("error.unlock_need_guild"));
@@ -1107,10 +1133,12 @@ public class GuildCommand {
         if (guild.getMotd() != null && !guild.getMotd().isEmpty()) {
             source.sendMessage(GuildTexts.t("info.motd_label").append(Text.literal(guild.getMotd()).styled(style -> style.withColor(guildColor).withItalic(Boolean.valueOf(true)))));
         }
-        boolean hasHome = guild.hasHome();
-        MutableText homeLine = GuildTexts.t("info.home_set_label").formatted(Formatting.AQUA);
-        homeLine.append(Text.literal(String.valueOf(hasHome)).formatted(hasHome ? Formatting.GREEN : Formatting.RED));
-        source.sendMessage((Text)homeLine);
+        if (GuildsConfig.enableGuildHome) {
+            boolean hasHome = guild.hasHome();
+            MutableText homeLine = GuildTexts.t("info.home_set_label").formatted(Formatting.AQUA);
+            homeLine.append(Text.literal(String.valueOf(hasHome)).formatted(hasHome ? Formatting.GREEN : Formatting.RED));
+            source.sendMessage((Text)homeLine);
+        }
         source.sendMessage(GuildTexts.t("info.created_label").append(Text.literal(guild.getFormattedDate()).formatted(Formatting.WHITE)));
         source.sendMessage(GuildTexts.t("info.master_label").append(Text.literal(guild.getOwnerName()).formatted(Formatting.AQUA)));
         source.sendMessage(GuildTexts.t("info.members_header", guild.getMembers().size()));

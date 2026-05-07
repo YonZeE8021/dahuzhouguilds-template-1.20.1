@@ -21,7 +21,9 @@
  */
 package com.dahuzhou.dahuzhouguilds.util;
 
+import java.util.ArrayList;
 import java.util.List;
+import com.dahuzhou.dahuzhouguilds.GuildsConfig;
 import com.dahuzhou.dahuzhouguilds.GuildTexts;
 import com.dahuzhou.dahuzhouguilds.util.GuildBankRankEditorMenu;
 import com.dahuzhou.dahuzhouguilds.util.GuildMembersMenu;
@@ -45,15 +47,25 @@ import net.minecraft.screen.ScreenHandlerType;
 import net.minecraft.screen.SimpleNamedScreenHandlerFactory;
 
 public class GuildPermissionsMenu {
-    public static final List<PositionedMenuItem> MENU_ITEMS = List.of(
-			new PositionedMenuItem(10, GuildPermissionsMenu.menuItem(Items.BOOK, GuildTexts.t("menu.entry.guild_info").formatted(Formatting.YELLOW), "/guild info")),
-			new PositionedMenuItem(12, GuildPermissionsMenu.menuItem(Items.CHEST, GuildTexts.t("menu.entry.guild_bank").formatted(Formatting.AQUA), "/guild bank 1")),
-			new PositionedMenuItem(14, GuildPermissionsMenu.menuItem(Items.WHITE_BED, GuildTexts.t("menu.entry.set_guild_home").formatted(Formatting.LIGHT_PURPLE), "/guild sethome")),
-			new PositionedMenuItem(16, GuildPermissionsMenu.menuItem(Items.ORANGE_DYE, GuildTexts.t("menu.entry.toggle_friendly_fire").formatted(Formatting.GOLD), "/guild toggle_friendlyfire")),
-			new PositionedMenuItem(28, GuildPermissionsMenu.menuItem(Items.PLAYER_HEAD, GuildTexts.t("menu.entry.manage_members").formatted(Formatting.GREEN), null)),
-			new PositionedMenuItem(30, GuildPermissionsMenu.menuItem(Items.WRITABLE_BOOK, GuildTexts.t("menu.entry.edit_ranks").formatted(Formatting.AQUA), null)),
-			new PositionedMenuItem(32, GuildPermissionsMenu.menuItem(Items.ENDER_CHEST, GuildTexts.t("menu.entry.bank_permissions").formatted(Formatting.BLUE), null)),
-			new PositionedMenuItem(34, GuildPermissionsMenu.menuItem(Items.BARRIER, GuildTexts.t("menu.entry.disband_guild").formatted(Formatting.RED), "/guild disband")));
+	/** 按配置组装（银行 / 公会驻地可关闭）。 */
+	public static List<PositionedMenuItem> menuItemsForConfig() {
+		ArrayList<PositionedMenuItem> list = new ArrayList<>();
+		list.add(new PositionedMenuItem(10, GuildPermissionsMenu.menuItem(Items.BOOK, GuildTexts.t("menu.entry.guild_info").formatted(Formatting.YELLOW), "/guild info")));
+		if (GuildsConfig.enableGuildBank) {
+			list.add(new PositionedMenuItem(12, GuildPermissionsMenu.menuItem(Items.CHEST, GuildTexts.t("menu.entry.guild_bank").formatted(Formatting.AQUA), "/guild bank 1")));
+		}
+		if (GuildsConfig.enableGuildHome) {
+			list.add(new PositionedMenuItem(14, GuildPermissionsMenu.menuItem(Items.WHITE_BED, GuildTexts.t("menu.entry.set_guild_home").formatted(Formatting.LIGHT_PURPLE), "/guild sethome")));
+		}
+		list.add(new PositionedMenuItem(16, GuildPermissionsMenu.menuItem(Items.ORANGE_DYE, GuildTexts.t("menu.entry.toggle_friendly_fire").formatted(Formatting.GOLD), "/guild toggle_friendlyfire")));
+		list.add(new PositionedMenuItem(28, GuildPermissionsMenu.menuItem(Items.PLAYER_HEAD, GuildTexts.t("menu.entry.manage_members").formatted(Formatting.GREEN), null)));
+		list.add(new PositionedMenuItem(30, GuildPermissionsMenu.menuItem(Items.WRITABLE_BOOK, GuildTexts.t("menu.entry.edit_ranks").formatted(Formatting.AQUA), null)));
+		if (GuildsConfig.enableGuildBank) {
+			list.add(new PositionedMenuItem(32, GuildPermissionsMenu.menuItem(Items.ENDER_CHEST, GuildTexts.t("menu.entry.bank_permissions").formatted(Formatting.BLUE), null)));
+		}
+		list.add(new PositionedMenuItem(34, GuildPermissionsMenu.menuItem(Items.BARRIER, GuildTexts.t("menu.entry.disband_guild").formatted(Formatting.RED), "/guild disband")));
+		return List.copyOf(list);
+	}
 
 	public static MenuItem menuItem(Item item, MutableText displayName, String command) {
 		ItemStack stack = new ItemStack((ItemConvertible)item);
@@ -70,7 +82,7 @@ public class GuildPermissionsMenu {
     public static void openForPlayer(ServerPlayerEntity player) {
         int size = 54;
         SimpleInventory inventory = new SimpleInventory(size);
-        for (PositionedMenuItem pm : MENU_ITEMS) {
+        for (PositionedMenuItem pm : menuItemsForConfig()) {
             if (pm.slot < 0 || pm.slot >= size) continue;
             inventory.setStack(pm.slot, pm.item.icon.copy());
         }
@@ -112,17 +124,16 @@ public class GuildPermissionsMenu {
 
         public void onSlotClick(int slot, int button, SlotActionType actionType, PlayerEntity player) {
             if (actionType == SlotActionType.PICKUP) {
-                for (PositionedMenuItem pm : MENU_ITEMS) {
+                for (PositionedMenuItem pm : menuItemsForConfig()) {
                     if (pm.slot != slot || !(player instanceof ServerPlayerEntity)) continue;
                     ServerPlayerEntity serverPlayer = (ServerPlayerEntity)player;
                     serverPlayer.closeHandledScreen();
-                    String label = pm.item.icon.getName().getString();
                     if (pm.item.command == null) {
-                        if (label.contains("Manage Members")) {
+                        if (pm.slot == 28) {
                             GuildMembersMenu.openForPlayer(serverPlayer);
-                        } else if (label.contains("Edit Ranks")) {
+                        } else if (pm.slot == 30) {
                             GuildRankEditorMenu.openForPlayer(serverPlayer);
-                        } else if (label.contains("Bank Permissions")) {
+                        } else if (pm.slot == 32 && GuildsConfig.enableGuildBank) {
                             GuildBankRankEditorMenu.openForPlayer(serverPlayer);
                         }
                     } else {
