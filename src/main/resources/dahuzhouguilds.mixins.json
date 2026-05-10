@@ -2,10 +2,12 @@
 	"required": true,
 	"package": "com.dahuzhou.dahuzhouguilds.mixin",
 	"compatibilityLevel": "JAVA_17",
+	"plugin": "com.dahuzhou.dahuzhouguilds.mixin.DahuzhouGuildsMixinPlugin",
 	"mixins": [
 		"AllyChatManagerMixin",
 		"GuildChatManagerMixin",
-		"LivingEntityDamageMixin"
+		"LivingEntityDamageMixin",
+		"compat.TargetHelperMixin"
 	],
 	"injectors": {
 		"defaultRequire": 1
