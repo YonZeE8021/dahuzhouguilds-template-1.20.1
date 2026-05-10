@@ -1144,31 +1144,6 @@ public class GuildCommand {
     }
 
     public static void disbandGuildCompletely(MinecraftServer server, Guild guild) {
-        String teamName = "guild_" + guild.getId().toString().substring(0, 8);
-        ServerScoreboard scoreboard = server.getScoreboard();
-        Team team = scoreboard.getTeam(teamName);
-        if (team != null) {
-            String modifyPrefixCommand = "/team modify " + teamName + " prefix \"\"";
-            server.getCommandManager().executeWithPrefix(server.getCommandSource(), modifyPrefixCommand);
-            System.out.println("[GuildsRemasteredMod] Removed prefix for team: " + teamName);
-            team.getPlayerList().clear();
-            server.getCommandManager().executeWithPrefix(server.getCommandSource(), "team remove " + teamName);
-            System.out.println("[GuildsRemasteredMod] Removed team: " + teamName);
-        } else {
-            System.out.println("[GuildsRemasteredMod] Team not found for removal: " + teamName);
-        }
-        for (UUID memberId : guild.getMembers().keySet()) {
-            ServerPlayerEntity member = server.getPlayerManager().getPlayer(memberId);
-            if (member == null) continue;
-            if (GuildsConfig.enableEssentialsCommandGuildPrefix) {
-                GuildPrefixHelper.clearNickname(member);
-            }
-            if (GuildsConfig.enableHungerBoundIntegration) {
-                GuildHungerBoundPrefixHelper.clearNickname(member);
-            }
-            GuildTeamUtil.clearTeamForPlayer(member, server);
-            GuildTeamUtil.forceUpdateForPlayer(member);
-        }
         String disbandedShortId = guild.getShortenedId();
         String disbandedName = guild.getName();
         for (String allyShortId : guild.getAllies().keySet()) {
@@ -1185,8 +1160,25 @@ public class GuildCommand {
         }
         GuildDataManager.removeAllInvitesToGuild(guild.getId());
         GuildDataManager.deleteGuild(server, guild.getId());
-        String guildShortId = guild.getShortenedId();
-        GuildBankManager.deleteBank(server, guildShortId);
+        String teamName = "guild_" + guild.getId().toString().substring(0, 8);
+        ServerScoreboard scoreboard = server.getScoreboard();
+        Team team = scoreboard.getTeam(teamName);
+        if (team != null) {
+            scoreboard.removeTeam(team);
+        }
+        for (UUID memberId : guild.getMembers().keySet()) {
+            ServerPlayerEntity member = server.getPlayerManager().getPlayer(memberId);
+            if (member == null) continue;
+            if (GuildsConfig.enableEssentialsCommandGuildPrefix) {
+                GuildPrefixHelper.clearNickname(member);
+            }
+            if (GuildsConfig.enableHungerBoundIntegration) {
+                GuildHungerBoundPrefixHelper.clearNickname(member);
+            }
+            GuildTeamUtil.clearTeamForPlayer(member, server);
+            GuildTeamUtil.forceUpdateForPlayer(member);
+        }
+        GuildBankManager.deleteBank(server, guild.getShortenedId());
     }
 
     public static int getRequiredNetheriteForTab(int nextTab) {
