@@ -163,16 +163,12 @@ public class GuildCommand {
             }
             GuildCommand.displayGuildInfo(source.getServer(), source, guild);
             return 1;
-        })).then(CommandManager.argument((String)"name", (ArgumentType)StringArgumentType.string()).executes(ctx -> {
-            ServerPlayerEntity player;
+        })).then(CommandManager.argument((String)"guildId", (ArgumentType)StringArgumentType.word()).executes(ctx -> {
             ServerCommandSource source = (ServerCommandSource)ctx.getSource();
-            String name = StringArgumentType.getString((CommandContext)ctx, (String)"name");
-            Guild guild = GuildDataManager.getGuildByName(name);
-            if (guild == null && (player = source.getServer().getPlayerManager().getPlayer(name)) != null) {
-                guild = GuildDataManager.getGuildByPlayer(player.getUuid());
-            }
+            String guildIdRaw = StringArgumentType.getString((CommandContext)ctx, (String)"guildId");
+            Guild guild = GuildDataManager.getGuildByIdInput(guildIdRaw);
             if (guild == null) {
-                source.sendError(GuildTexts.t("error.info_not_found"));
+                source.sendError(GuildTexts.t("error.guild_id_not_found"));
                 return 0;
             }
             GuildCommand.displayGuildInfo(source.getServer(), source, guild);
@@ -207,51 +203,9 @@ public class GuildCommand {
                 source.sendError(GuildTexts.t("error.only_owner_disband"));
                 return 0;
             }
-            String teamName = "guild_" + guild.getId().toString().substring(0, 8);
-            ServerScoreboard scoreboard = server.getScoreboard();
-            Team team = scoreboard.getTeam(teamName);
-            if (team != null) {
-                String modifyPrefixCommand = "/team modify " + teamName + " prefix \"\"";
-                server.getCommandManager().executeWithPrefix(server.getCommandSource(), modifyPrefixCommand);
-                System.out.println("[GuildsRemasteredMod] Removed prefix for team: " + teamName);
-                team.getPlayerList().clear();
-                server.getCommandManager().executeWithPrefix(server.getCommandSource(), "team remove " + teamName);
-                System.out.println("[GuildsRemasteredMod] Removed team: " + teamName);
-            } else {
-                System.out.println("[GuildsRemasteredMod] Team not found for removal: " + teamName);
-            }
-            for (UUID memberId : guild.getMembers().keySet()) {
-                ServerPlayerEntity member = server.getPlayerManager().getPlayer(memberId);
-                if (member == null) continue;
-                if (GuildsConfig.enableEssentialsCommandGuildPrefix) {
-                    GuildPrefixHelper.clearNickname(member);
-                }
-                if (GuildsConfig.enableHungerBoundIntegration) {
-                    GuildHungerBoundPrefixHelper.clearNickname(member);
-                }
-                GuildTeamUtil.clearTeamForPlayer(member, server);
-                GuildTeamUtil.forceUpdateForPlayer(member);
-            }
-            UUID disbandedId = guild.getId();
-            String disbandedShortId = "guild_" + disbandedId.toString().substring(0, 8);
             String disbandedName = guild.getName();
-            for (String allyShortId : guild.getAllies().keySet()) {
-                Map<String, Guild.AllyInfo> theirAllies;
-                Guild allyGuild = GuildDataManager.getGuildByShortId(allyShortId);
-                if (allyGuild == null || !(theirAllies = allyGuild.getAllies()).containsKey(disbandedShortId)) continue;
-                theirAllies.remove(disbandedShortId);
-                GuildDataManager.saveGuild(server, allyGuild);
-                for (UUID memberId : allyGuild.getMembers().keySet()) {
-                    ServerPlayerEntity allyPlayer = server.getPlayerManager().getPlayer(memberId);
-                    if (allyPlayer == null) continue;
-                    allyPlayer.sendMessage(GuildTexts.t("disband.ally_notice_prefix").append(Text.literal(disbandedName).formatted(Formatting.YELLOW)).append(GuildTexts.t("disband.ally_notice_suffix")));
-                }
-            }
-            GuildDataManager.removeAllInvitesToGuild(guild.getId());
-            GuildDataManager.deleteGuild(server, guild.getId());
-            String guildShortId = guild.getShortenedId();
-            GuildBankManager.deleteBank(server, guildShortId);
-            source.sendFeedback(() -> GuildTexts.t("disband.success_prefix").append(Text.literal(guild.getName()).formatted(Formatting.RED)).append(GuildTexts.t("disband.success_suffix")), false);
+            GuildCommand.disbandGuildCompletely(server, guild);
+            source.sendFeedback(() -> GuildTexts.t("disband.success_prefix").append(Text.literal(disbandedName).formatted(Formatting.RED)).append(GuildTexts.t("disband.success_suffix")), false);
             return 1;
         }))).then(CommandManager.literal((String)"invite").then(CommandManager.argument((String)"player", (ArgumentType)StringArgumentType.word()).suggests((ctx, builder) -> {
             for (ServerPlayerEntity p : ((ServerCommandSource)ctx.getSource()).getServer().getPlayerManager().getPlayerList()) {
@@ -759,11 +713,11 @@ public class GuildCommand {
                 }
             });
             return 1;
-        }))).then(CommandManager.literal((String)"ally").then(CommandManager.argument((String)"guild", (ArgumentType)StringArgumentType.greedyString()).executes(ctx -> {
+        }))).then(CommandManager.literal((String)"ally").then(CommandManager.argument((String)"guildId", (ArgumentType)StringArgumentType.word()).executes(ctx -> {
             ServerCommandSource source = (ServerCommandSource)ctx.getSource();
             ServerPlayerEntity sender = source.getPlayer();
             MinecraftServer server = source.getServer();
-            String targetGuildName = StringArgumentType.getString((CommandContext)ctx, (String)"guild");
+            String targetGuildIdRaw = StringArgumentType.getString((CommandContext)ctx, (String)"guildId");
             Guild senderGuild = GuildDataManager.getGuildByPlayer(sender.getUuid());
             if (senderGuild == null) {
                 source.sendError(GuildTexts.t("error.not_in_guild"));
@@ -774,9 +728,9 @@ public class GuildCommand {
                 source.sendError(GuildTexts.t("error.ally_only_master"));
                 return 0;
             }
-            Guild targetGuild = GuildDataManager.getGuildByName(targetGuildName);
+            Guild targetGuild = GuildDataManager.getGuildByIdInput(targetGuildIdRaw);
             if (targetGuild == null) {
-                source.sendError(GuildTexts.t("error.ally_guild_not_found", targetGuildName));
+                source.sendError(GuildTexts.t("error.ally_guild_not_found", targetGuildIdRaw));
                 return 0;
             }
             if (senderGuild.getId().equals(targetGuild.getId())) {
@@ -785,7 +739,7 @@ public class GuildCommand {
             }
             String targetShortId = "guild_" + targetGuild.getId().toString().substring(0, 8);
             if (senderGuild.getAllies().containsKey(targetShortId)) {
-                MutableText yesButton = GuildTexts.t("common.button_yes").setStyle(Style.EMPTY.withColor(Formatting.RED).withClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/guild allyrevoke " + targetShortId)).withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, GuildTexts.t("ally.revoke_hover_yes"))));
+                MutableText yesButton = GuildTexts.t("common.button_yes").setStyle(Style.EMPTY.withColor(Formatting.RED).withClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/guild allyrevoke " + targetGuild.getId())).withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, GuildTexts.t("ally.revoke_hover_yes"))));
                 MutableText noButton = GuildTexts.t("common.button_no").setStyle(Style.EMPTY.withColor(Formatting.GREEN).withClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/guild cancel")).withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, GuildTexts.t("common.hover_cancel"))));
                 sender.sendMessage(GuildTexts.t("ally.already_allied_prefix").append(Text.literal(targetGuild.getName()).formatted(Formatting.YELLOW)).append(GuildTexts.t("ally.already_allied_suffix")).append(yesButton).append(Text.literal(" ")).append(noButton), false);
                 return 0;
@@ -899,7 +853,12 @@ public class GuildCommand {
                 for (Map.Entry<String, Guild.AllyInfo> ally : playerGuild.getAllies().entrySet()) {
                     String shortId = ally.getKey();
                     String name = ally.getValue().name;
-                    builder.suggest(shortId, (Message)Text.literal((String)name));
+                    Guild g = GuildDataManager.getGuildByShortId(shortId);
+                    if (g != null) {
+                        builder.suggest(g.getId().toString(), (Message)Text.literal(name));
+                    } else {
+                        builder.suggest(shortId, (Message)Text.literal(name));
+                    }
                 }
             }
             return builder.buildFuture();
@@ -908,7 +867,7 @@ public class GuildCommand {
             ServerPlayerEntity player = source.getPlayer();
             MinecraftServer server = source.getServer();
             UUID playerId = player.getUuid();
-            String shortId = StringArgumentType.getString((CommandContext)ctx, (String)"guildId");
+            String guildIdRaw = StringArgumentType.getString((CommandContext)ctx, (String)"guildId");
             Guild selfGuild = GuildDataManager.getGuildByPlayer(playerId);
             if (selfGuild == null) {
                 source.sendError(GuildTexts.t("error.not_in_guild"));
@@ -918,26 +877,22 @@ public class GuildCommand {
                 source.sendError(GuildTexts.t("error.ally_revoke_not_master"));
                 return 0;
             }
-            if (!selfGuild.getAllies().containsKey(shortId)) {
+            Guild targetGuild = GuildDataManager.getGuildByIdInput(guildIdRaw);
+            if (targetGuild == null) {
+                source.sendError(GuildTexts.t("error.guild_id_not_found"));
+                return 0;
+            }
+            String targetShortId = targetGuild.getShortenedId();
+            if (!selfGuild.getAllies().containsKey(targetShortId)) {
                 source.sendError(GuildTexts.t("error.ally_not_allied"));
                 return 0;
             }
-            Guild targetGuild = null;
-            for (Guild g : GuildDataManager.getAllGuilds()) {
-                if (!g.getShortenedId().equals(shortId)) continue;
-                targetGuild = g;
-                break;
-            }
-            if (targetGuild == null) {
-                source.sendError(GuildTexts.t("error.ally_target_missing"));
-                return 0;
-            }
-            selfGuild.getAllies().remove(shortId);
+            selfGuild.getAllies().remove(targetShortId);
             String selfShortId = selfGuild.getShortenedId();
             targetGuild.getAllies().remove(selfShortId);
             GuildDataManager.saveGuild(server, selfGuild);
             GuildDataManager.saveGuild(server, targetGuild);
-            AllyChatBridgeManager.removeBridge(selfShortId, shortId);
+            AllyChatBridgeManager.removeBridge(selfShortId, targetShortId);
             player.sendMessage(GuildTexts.t("ally.revoked_self_prefix").append(Text.literal(targetGuild.getName()).formatted(Formatting.RED)));
             ServerPlayerEntity targetOwner = server.getPlayerManager().getPlayer(targetGuild.getOwnerId());
             if (targetOwner != null) {
@@ -1197,14 +1152,62 @@ public class GuildCommand {
         })));
     }
 
+    public static void disbandGuildCompletely(MinecraftServer server, Guild guild) {
+        String teamName = "guild_" + guild.getId().toString().substring(0, 8);
+        ServerScoreboard scoreboard = server.getScoreboard();
+        Team team = scoreboard.getTeam(teamName);
+        if (team != null) {
+            String modifyPrefixCommand = "/team modify " + teamName + " prefix \"\"";
+            server.getCommandManager().executeWithPrefix(server.getCommandSource(), modifyPrefixCommand);
+            System.out.println("[GuildsRemasteredMod] Removed prefix for team: " + teamName);
+            team.getPlayerList().clear();
+            server.getCommandManager().executeWithPrefix(server.getCommandSource(), "team remove " + teamName);
+            System.out.println("[GuildsRemasteredMod] Removed team: " + teamName);
+        } else {
+            System.out.println("[GuildsRemasteredMod] Team not found for removal: " + teamName);
+        }
+        for (UUID memberId : guild.getMembers().keySet()) {
+            ServerPlayerEntity member = server.getPlayerManager().getPlayer(memberId);
+            if (member == null) continue;
+            if (GuildsConfig.enableEssentialsCommandGuildPrefix) {
+                GuildPrefixHelper.clearNickname(member);
+            }
+            if (GuildsConfig.enableHungerBoundIntegration) {
+                GuildHungerBoundPrefixHelper.clearNickname(member);
+            }
+            GuildTeamUtil.clearTeamForPlayer(member, server);
+            GuildTeamUtil.forceUpdateForPlayer(member);
+        }
+        UUID disbandedId = guild.getId();
+        String disbandedShortId = "guild_" + disbandedId.toString().substring(0, 8);
+        String disbandedName = guild.getName();
+        for (String allyShortId : guild.getAllies().keySet()) {
+            Map<String, Guild.AllyInfo> theirAllies;
+            Guild allyGuild = GuildDataManager.getGuildByShortId(allyShortId);
+            if (allyGuild == null || !(theirAllies = allyGuild.getAllies()).containsKey(disbandedShortId)) continue;
+            theirAllies.remove(disbandedShortId);
+            GuildDataManager.saveGuild(server, allyGuild);
+            for (UUID memberId : allyGuild.getMembers().keySet()) {
+                ServerPlayerEntity allyPlayer = server.getPlayerManager().getPlayer(memberId);
+                if (allyPlayer == null) continue;
+                allyPlayer.sendMessage(GuildTexts.t("disband.ally_notice_prefix").append(Text.literal(disbandedName).formatted(Formatting.YELLOW)).append(GuildTexts.t("disband.ally_notice_suffix")));
+            }
+        }
+        GuildDataManager.removeAllInvitesToGuild(guild.getId());
+        GuildDataManager.deleteGuild(server, guild.getId());
+        String guildShortId = guild.getShortenedId();
+        GuildBankManager.deleteBank(server, guildShortId);
+    }
+
     public static int getRequiredNetheriteForTab(int nextTab) {
         int baseCost = 8;
         return baseCost * nextTab;
     }
 
-    private static void displayGuildInfo(MinecraftServer server, ServerCommandSource source, Guild guild) {
+    public static void displayGuildInfo(MinecraftServer server, ServerCommandSource source, Guild guild) {
         Formatting guildColor = GuildColorUtil.getFormatting(guild.getColor());
         source.sendMessage(GuildTexts.t("info.guild_label").append(Text.literal(guild.getName()).formatted(guildColor)));
+        source.sendMessage(GuildTexts.t("info.guild_id_label").append(Text.literal(guild.getId().toString()).formatted(Formatting.GRAY)));
         if (guild.getMotd() != null && !guild.getMotd().isEmpty()) {
             source.sendMessage(GuildTexts.t("info.motd_label").append(Text.literal(guild.getMotd()).styled(style -> style.withColor(guildColor).withItalic(Boolean.valueOf(true)))));
         }

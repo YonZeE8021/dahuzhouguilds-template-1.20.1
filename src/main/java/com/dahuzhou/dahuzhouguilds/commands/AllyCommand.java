@@ -45,19 +45,18 @@ import net.minecraft.server.MinecraftServer;
 
 public class AllyCommand {
     public static void register(CommandDispatcher<ServerCommandSource> dispatcher) {
-        dispatcher.register((LiteralArgumentBuilder)((LiteralArgumentBuilder)((LiteralArgumentBuilder)((LiteralArgumentBuilder)((LiteralArgumentBuilder)CommandManager.literal((String)"ally").then(CommandManager.literal((String)"chat").then(CommandManager.argument((String)"guildName", (ArgumentType)StringArgumentType.word()).executes(ctx -> {
+        dispatcher.register((LiteralArgumentBuilder)((LiteralArgumentBuilder)((LiteralArgumentBuilder)((LiteralArgumentBuilder)((LiteralArgumentBuilder)CommandManager.literal((String)"ally").then(CommandManager.literal((String)"chat").then(CommandManager.argument((String)"guildId", (ArgumentType)StringArgumentType.word()).executes(ctx -> {
             UUID currentTarget;
             ServerCommandSource source = (ServerCommandSource)ctx.getSource();
             ServerPlayerEntity player = source.getPlayer();
-            MinecraftServer server = source.getServer();
             UUID playerId = player.getUuid();
             Guild playerGuild = GuildDataManager.getGuildByPlayer(playerId);
             if (playerGuild == null) {
                 source.sendError(GuildTexts.t("error.not_in_guild"));
                 return 0;
             }
-            String targetGuildName = StringArgumentType.getString((CommandContext)ctx, (String)"guildName");
-            Guild targetGuild = GuildDataManager.getGuildByName(targetGuildName);
+            String targetGuildIdRaw = StringArgumentType.getString((CommandContext)ctx, (String)"guildId");
+            Guild targetGuild = GuildDataManager.getGuildByIdInput(targetGuildIdRaw);
             if (targetGuild == null) {
                 source.sendError(GuildTexts.t("ally_cmd.chat_guild_not_found"));
                 return 0;
@@ -85,7 +84,7 @@ public class AllyCommand {
                 source.sendFeedback(() -> GuildTexts.t("ally_cmd.chat_enabled", targetGuild.getName()), false);
             }
             return 1;
-        })))).then(CommandManager.literal((String)"togglepvp").then(CommandManager.argument((String)"guildName", (ArgumentType)StringArgumentType.word()).executes(ctx -> {
+        })))).then(CommandManager.literal((String)"togglepvp").then(CommandManager.argument((String)"guildId", (ArgumentType)StringArgumentType.word()).executes(ctx -> {
             ServerCommandSource source = (ServerCommandSource)ctx.getSource();
             ServerPlayerEntity player = source.getPlayer();
             MinecraftServer server = source.getServer();
@@ -99,8 +98,8 @@ public class AllyCommand {
                 source.sendError(GuildTexts.t("ally_cmd.pvp_only_master"));
                 return 0;
             }
-            String targetName = StringArgumentType.getString((CommandContext)ctx, (String)"guildName");
-            Guild target = GuildDataManager.getGuildByName(targetName);
+            String targetGuildIdRaw = StringArgumentType.getString((CommandContext)ctx, (String)"guildId");
+            Guild target = GuildDataManager.getGuildByIdInput(targetGuildIdRaw);
             if (target == null) {
                 source.sendError(GuildTexts.t("ally_cmd.pvp_guild_not_found"));
                 return 0;

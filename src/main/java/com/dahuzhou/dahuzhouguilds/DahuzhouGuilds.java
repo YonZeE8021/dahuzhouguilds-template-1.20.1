@@ -3,6 +3,7 @@ package com.dahuzhou.dahuzhouguilds;
 import com.dahuzhou.dahuzhouguilds.GuildsConfig;
 import com.dahuzhou.dahuzhouguilds.GuildTexts;
 import com.dahuzhou.dahuzhouguilds.commands.AllyCommand;
+import com.dahuzhou.dahuzhouguilds.commands.GuildAdminCommand;
 import com.dahuzhou.dahuzhouguilds.commands.GuildCommand;
 import com.dahuzhou.dahuzhouguilds.data.GuildBankManager;
 import com.dahuzhou.dahuzhouguilds.data.GuildDataManager;
@@ -44,6 +45,8 @@ public class DahuzhouGuilds implements ModInitializer {
 				GuildCommand.register((CommandDispatcher<ServerCommandSource>) dispatcher));
 		CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) ->
 				AllyCommand.register((CommandDispatcher<ServerCommandSource>) dispatcher));
+		CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) ->
+				GuildAdminCommand.register((CommandDispatcher<ServerCommandSource>) dispatcher));
 		ServerTickEvents.END_SERVER_TICK.register(DelayedTeleportScheduler::tick);
 		ServerPlayConnectionEvents.JOIN.register((handler, sender, server) -> {
 			ServerPlayerEntity player = handler.player;

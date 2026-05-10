@@ -172,6 +172,39 @@ public class GuildDataManager {
         return guilds.values().stream().filter(g -> g.getName().equalsIgnoreCase(name)).findFirst().orElse(null);
     }
 
+    /**
+     * 解析指令中的公會識別：完整 UUID，或舊版 {@code guild_} 開頭的短 ID（與存檔 / 盟友鍵一致）。
+     */
+    public static Guild getGuildByIdInput(String raw) {
+        if (raw == null) {
+            return null;
+        }
+        String t = raw.trim();
+        if (t.isEmpty()) {
+            return null;
+        }
+        try {
+            Guild byUuid = GuildDataManager.getGuildById(UUID.fromString(t));
+            if (byUuid != null) {
+                return byUuid;
+            }
+        }
+        catch (IllegalArgumentException ignored) {
+        }
+        if (t.startsWith("guild_")) {
+            return GuildDataManager.getGuildByShortId(t);
+        }
+        return null;
+    }
+
+    public static void clearAllInvites() {
+        invites.clear();
+    }
+
+    public static void clearAllPendingAllyRequests() {
+        pendingAllyRequests.clear();
+    }
+
     public static void registerGuild(Guild guild) {
         guilds.put(guild.getId(), guild);
     }
