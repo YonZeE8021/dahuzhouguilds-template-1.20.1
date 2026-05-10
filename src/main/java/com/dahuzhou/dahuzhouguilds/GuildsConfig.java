@@ -13,11 +13,14 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
+import java.io.BufferedReader;
+import java.io.BufferedWriter;
 import java.io.File;
-import java.io.FileReader;
-import java.io.FileWriter;
 import java.io.IOException;
 import java.io.Reader;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.StandardOpenOption;
 
 public class GuildsConfig {
     private static final File CONFIG_FILE = new File("config/guilds_remastered_config.json");
@@ -56,7 +59,7 @@ public class GuildsConfig {
             return;
         }
         JsonObject json = null;
-        try (FileReader reader = new FileReader(CONFIG_FILE);){
+        try (BufferedReader reader = Files.newBufferedReader(CONFIG_FILE.toPath(), StandardCharsets.UTF_8)) {
             json = (JsonObject)GSON.fromJson((Reader)reader, JsonObject.class);
         }
         catch (Exception e) {
@@ -137,7 +140,7 @@ public class GuildsConfig {
         if (!changed) {
             return;
         }
-        try (FileWriter writer = new FileWriter(CONFIG_FILE)) {
+        try (BufferedWriter writer = Files.newBufferedWriter(CONFIG_FILE.toPath(), StandardCharsets.UTF_8, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.WRITE)) {
             GSON.toJson((JsonElement)json, (Appendable)writer);
             System.out.println("[GuildConfig] Updated guilds_remastered_config.json with missing keys.");
         }
@@ -162,7 +165,7 @@ public class GuildsConfig {
             json.addProperty("require_Op_To_Create_Guild", Boolean.valueOf(requireOpToCreateGuild));
             json.addProperty(COMMENT_REQUIRE_OP_TO_TRANSFER_GUILD_KEY, COMMENT_REQUIRE_OP_TO_TRANSFER_GUILD);
             json.addProperty("require_Op_To_Transfer_Guild", Boolean.valueOf(requireOpToTransferGuild));
-            try (FileWriter writer = new FileWriter(CONFIG_FILE);){
+            try (BufferedWriter writer = Files.newBufferedWriter(CONFIG_FILE.toPath(), StandardCharsets.UTF_8, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.WRITE)) {
                 GSON.toJson((JsonElement)json, (Appendable)writer);
             }
         }

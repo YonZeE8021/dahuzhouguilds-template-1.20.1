@@ -119,7 +119,7 @@ public class AllyCommand {
             boolean selfPvpDisabled = Boolean.TRUE.equals(selfAlly.pvpDisabled);
             boolean targetPvpDisabled = Boolean.TRUE.equals(targetAlly.pvpDisabled);
             if (selfPvpDisabled && targetPvpDisabled) {
-                MutableText confirmButton = GuildTexts.t("common.button_yes").setStyle(Style.EMPTY.withColor(Formatting.RED).withClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/ally pvpdisableconfirm " + String.valueOf(target.getId()))).withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, GuildTexts.t("ally_cmd.pvp_reenable_hover_yes"))));
+                MutableText confirmButton = GuildTexts.t("common.button_yes").setStyle(Style.EMPTY.withColor(Formatting.RED).withClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/ally pvpdisableconfirm " + target.getShortenedId())).withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, GuildTexts.t("ally_cmd.pvp_reenable_hover_yes"))));
                 MutableText cancelButton = GuildTexts.t("common.button_no").setStyle(Style.EMPTY.withColor(Formatting.GREEN).withClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/guild cancel")).withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, GuildTexts.t("common.hover_cancel"))));
                 player.sendMessage(GuildTexts.t("ally_cmd.pvp_reenable_question_prefix").append(Text.literal(target.getName()).formatted(Formatting.YELLOW)).append(GuildTexts.t("ally_cmd.pvp_reenable_question_suffix")).append(confirmButton).append(Text.literal(" ")).append(cancelButton), false);
                 return 1;
@@ -131,18 +131,21 @@ public class AllyCommand {
             }
             GuildDataManager.addPvpEnableRequest(target.getOwnerId(), self.getId());
             player.sendMessage(GuildTexts.t("ally_cmd.pvp_request_sent", target.getName()).formatted(Formatting.GREEN), false);
-            MutableText accept = GuildTexts.t("ally.button_accept").setStyle(Style.EMPTY.withColor(Formatting.GREEN).withClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/ally pvpenableaccept " + String.valueOf(self.getId()))).withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, GuildTexts.t("ally_cmd.pvp_disable_hover_accept"))));
-            MutableText deny = GuildTexts.t("ally.button_deny").setStyle(Style.EMPTY.withColor(Formatting.RED).withClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/ally pvpenabledeny " + String.valueOf(self.getId()))).withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, GuildTexts.t("ally_cmd.pvp_disable_hover_deny"))));
+            MutableText accept = GuildTexts.t("ally.button_accept").setStyle(Style.EMPTY.withColor(Formatting.GREEN).withClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/ally pvpenableaccept " + self.getShortenedId())).withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, GuildTexts.t("ally_cmd.pvp_disable_hover_accept"))));
+            MutableText deny = GuildTexts.t("ally.button_deny").setStyle(Style.EMPTY.withColor(Formatting.RED).withClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/ally pvpenabledeny " + self.getShortenedId())).withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, GuildTexts.t("ally_cmd.pvp_disable_hover_deny"))));
             targetMaster.sendMessage(GuildTexts.t("ally_cmd.pvp_disable_incoming_prefix").append(Text.literal(self.getName()).formatted(Formatting.YELLOW)).append(GuildTexts.t("ally_cmd.pvp_disable_incoming_suffix")).append(accept).append(Text.literal(" ")).append(deny), false);
             return 1;
         })))).then(CommandManager.literal((String)"pvpenableaccept").then(CommandManager.argument((String)"guildId", (ArgumentType)StringArgumentType.word()).executes(ctx -> {
             ServerPlayerEntity player = ((ServerCommandSource)ctx.getSource()).getPlayer();
             MinecraftServer server = ((ServerCommandSource)ctx.getSource()).getServer();
             UUID receiverId = player.getUuid();
-            UUID senderGuildId = UUID.fromString(StringArgumentType.getString((CommandContext)ctx, (String)"guildId"));
-            Guild senderGuild = GuildDataManager.getGuildById(senderGuildId);
+            Guild senderGuild = GuildDataManager.getGuildByIdInput(StringArgumentType.getString((CommandContext)ctx, (String)"guildId"));
             Guild receiverGuild = GuildDataManager.getGuildByPlayer(receiverId);
-            if (senderGuild == null || receiverGuild == null) {
+            if (senderGuild == null) {
+                ((ServerCommandSource)ctx.getSource()).sendError(GuildTexts.t("error.invalid_guild_id"));
+                return 0;
+            }
+            if (receiverGuild == null) {
                 ((ServerCommandSource)ctx.getSource()).sendError(GuildTexts.t("ally_cmd.pvp_guild_missing_pair"));
                 return 0;
             }
@@ -165,11 +168,14 @@ public class AllyCommand {
             ServerPlayerEntity player = ((ServerCommandSource)ctx.getSource()).getPlayer();
             MinecraftServer server = ((ServerCommandSource)ctx.getSource()).getServer();
             UUID requesterId = player.getUuid();
-            UUID targetGuildId = UUID.fromString(StringArgumentType.getString((CommandContext)ctx, (String)"guildId"));
             Guild self = GuildDataManager.getGuildByPlayer(requesterId);
-            Guild target = GuildDataManager.getGuildById(targetGuildId);
-            if (self == null || target == null) {
+            Guild target = GuildDataManager.getGuildByIdInput(StringArgumentType.getString((CommandContext)ctx, (String)"guildId"));
+            if (self == null) {
                 ((ServerCommandSource)ctx.getSource()).sendError(GuildTexts.t("ally_cmd.pvp_guild_not_found"));
+                return 0;
+            }
+            if (target == null) {
+                ((ServerCommandSource)ctx.getSource()).sendError(GuildTexts.t("error.invalid_guild_id"));
                 return 0;
             }
             String selfShort = self.getShortenedId();

@@ -36,6 +36,8 @@ public class Guild {
     private Double homeY = null;
     private Double homeZ = null;
     private String homeWorld = null;
+    /** 0–9999，用於指令與存檔中的四位公會編號；載入後由 {@link com.dahuzhou.dahuzhouguilds.data.GuildDataManager} 保證已分配。 */
+    private int numericPublicId = -1;
 
     public Guild(UUID id, String name, String color, Instant createdAt, UUID ownerId, String ownerName, boolean friendlyFire) {
         this.id = id;
@@ -104,8 +106,29 @@ public class Guild {
         this.rankPermissions.put("Initiate", initiatePermissions);
     }
 
+    public static String formatPublicId(int numericId) {
+        if (numericId < 0 || numericId > 9999) {
+            throw new IllegalArgumentException("numericId out of range 0..9999: " + numericId);
+        }
+        return String.format("%04d", numericId);
+    }
+
+    public int getNumericPublicId() {
+        return this.numericPublicId;
+    }
+
+    public void setNumericPublicId(int numericPublicId) {
+        this.numericPublicId = numericPublicId;
+    }
+
+    /**
+     * 銀行檔、盟友 Map 鍵、結盟橋接等使用的短識別符；為四位數字（含前導零）。
+     */
     public String getShortenedId() {
-        return "guild_" + this.id.toString().substring(0, 8);
+        if (this.numericPublicId < 0) {
+            throw new IllegalStateException("Guild numericPublicId not assigned yet: " + this.name);
+        }
+        return Guild.formatPublicId(this.numericPublicId);
     }
 
     public UUID getId() {
@@ -234,12 +257,12 @@ public class Guild {
         return this.pendingAllyRequests;
     }
 
-    public void addAlly(UUID guildId, String name) {
-        this.allies.put("guild_" + guildId.toString().substring(0, 8), new AllyInfo(name, false));
+    public void addAlly(Guild otherGuild, String allyDisplayName) {
+        this.allies.put(otherGuild.getShortenedId(), new AllyInfo(allyDisplayName, false));
     }
 
-    public void removeAlly(UUID guildId) {
-        this.allies.remove("guild_" + guildId.toString().substring(0, 8));
+    public void removeAlly(Guild otherGuild) {
+        this.allies.remove(otherGuild.getShortenedId());
     }
 
     public void addEnemy(UUID guildId) {

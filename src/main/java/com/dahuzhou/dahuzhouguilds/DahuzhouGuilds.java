@@ -61,12 +61,12 @@ public class DahuzhouGuilds implements ModInitializer {
 				String teamName = "guild_" + guild.getId().toString().substring(0, 8);
 				ServerScoreboard scoreboard = server.getScoreboard();
 				Team team = scoreboard.getTeam(teamName);
-				String guildShortId = guild.getId().toString().substring(0, 8);
+				String guildBankKey = guild.getShortenedId();
 				if (GuildsConfig.enableGuildBank) {
-					Path bankFilePath = GuildBankManager.getBankFilePath(server, guildShortId);
+					Path bankFilePath = GuildBankManager.getBankFilePath(server, guildBankKey);
 					if (!Files.exists(bankFilePath)) {
-						GuildBankManager.createBank(server, guildShortId);
-						LOGGER.info("[GuildBank] Created new bank for guild: {}", guildShortId);
+						GuildBankManager.createBank(server, guildBankKey);
+						LOGGER.info("[GuildBank] Created new bank for guild: {}", guildBankKey);
 					}
 				}
 				if (team != null) {

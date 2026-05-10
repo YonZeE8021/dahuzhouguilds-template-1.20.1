@@ -38,7 +38,7 @@ public final class GuildAdminCommand {
                     ServerCommandSource source = ctx.getSource();
                     int n = 0;
                     for (Guild g : GuildDataManager.getAllGuilds()) {
-                        source.sendMessage(GuildTexts.t("admin.list_line", g.getName(), g.getId().toString()).formatted(Formatting.GRAY));
+                        source.sendMessage(GuildTexts.t("admin.list_line", g.getName(), g.getShortenedId()).formatted(Formatting.GRAY));
                         ++n;
                     }
                     final int total = n;

@@ -28,19 +28,22 @@ import com.google.gson.JsonParseException;
 import com.google.gson.JsonSerializationContext;
 import com.google.gson.JsonSerializer;
 import java.io.BufferedReader;
+import java.io.BufferedWriter;
 import java.io.File;
-import java.io.FileReader;
-import java.io.FileWriter;
 import java.io.IOException;
 import java.io.Reader;
 import java.lang.reflect.Type;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.LinkOption;
 import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -71,7 +74,7 @@ public class GuildDataManager {
             return;
         }
         for (File file : files) {
-            try (FileReader reader = new FileReader(file);){
+            try (BufferedReader reader = Files.newBufferedReader(file.toPath(), StandardCharsets.UTF_8)) {
                 Guild guild = (Guild)GSON.fromJson((Reader)reader, Guild.class);
                 if (guild == null) continue;
                 guilds.put(guild.getId(), guild);
@@ -82,7 +85,113 @@ public class GuildDataManager {
             }
         }
         System.out.println("[GuildDataManager] Loaded " + guilds.size() + " guild(s).");
+        GuildDataManager.finishLoad(server);
         GuildDataManager.loadPlayerGuildMemberships(server);
+    }
+
+    /**
+     * 分配四位數字編號、遷移盟友鍵與公會銀行檔名，並回寫存檔。
+     */
+    private static void finishLoad(MinecraftServer server) {
+        GuildDataManager.ensureAllGuildsHaveNumericIds();
+        GuildDataManager.migrateAllAllyKeys();
+        GuildBankManager.migrateLegacyBankFiles(server, guilds.values());
+        GuildBankManager.clearBankCache();
+        for (Guild g : guilds.values()) {
+            GuildDataManager.saveGuild(server, g);
+        }
+    }
+
+    private static int nextFreeNumericId(Set<Integer> used) {
+        for (int i = 0; i < 10000; ++i) {
+            if (!used.contains(i)) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    private static void ensureAllGuildsHaveNumericIds() {
+        HashSet<Integer> used = new HashSet<Integer>();
+        ArrayList<Guild> needNew = new ArrayList<Guild>();
+        for (Guild g : guilds.values()) {
+            int n = g.getNumericPublicId();
+            if (n >= 0 && n <= 9999 && !used.contains(n)) {
+                used.add(n);
+                continue;
+            }
+            needNew.add(g);
+        }
+        for (Guild g : needNew) {
+            int free = GuildDataManager.nextFreeNumericId(used);
+            if (free < 0) {
+                System.err.println("[GuildDataManager] Cannot assign numeric guild id (max 10000 guilds): " + g.getName());
+                continue;
+            }
+            g.setNumericPublicId(free);
+            used.add(free);
+        }
+    }
+
+    private static String resolveAllyKeyToPublicShort(String key) {
+        if (key == null) {
+            return null;
+        }
+        if (key.matches("\\d{4}")) {
+            return key;
+        }
+        String rest = key.startsWith("guild_") ? key.substring("guild_".length()) : key;
+        if (rest.matches("[0-9a-fA-F]{8}")) {
+            for (Guild g : guilds.values()) {
+                if (!g.getId().toString().startsWith(rest)) continue;
+                return g.getShortenedId();
+            }
+        }
+        return null;
+    }
+
+    private static void migrateAllAllyKeys() {
+        for (Guild guild : guilds.values()) {
+            Map<String, Guild.AllyInfo> allies = guild.getAllies();
+            if (allies.isEmpty()) {
+                continue;
+            }
+            LinkedHashMap<String, Guild.AllyInfo> replacement = new LinkedHashMap<String, Guild.AllyInfo>();
+            boolean changed = false;
+            for (Map.Entry<String, Guild.AllyInfo> e : new ArrayList<Map.Entry<String, Guild.AllyInfo>>(allies.entrySet())) {
+                String key = e.getKey();
+                Guild.AllyInfo info = e.getValue();
+                String newKey = GuildDataManager.resolveAllyKeyToPublicShort(key);
+                if (newKey == null) {
+                    newKey = key;
+                }
+                if (!newKey.equals(key)) {
+                    changed = true;
+                }
+                replacement.putIfAbsent(newKey, info);
+            }
+            if (!changed) continue;
+            allies.clear();
+            allies.putAll(replacement);
+        }
+    }
+
+    public static void assignNumericIdForNewGuild(Guild guild) {
+        if (guild.getNumericPublicId() >= 0 && guild.getNumericPublicId() <= 9999) {
+            return;
+        }
+        HashSet<Integer> used = new HashSet<Integer>();
+        for (Guild o : guilds.values()) {
+            if (o == guild) continue;
+            int n = o.getNumericPublicId();
+            if (n < 0 || n > 9999) continue;
+            used.add(n);
+        }
+        int free = GuildDataManager.nextFreeNumericId(used);
+        if (free < 0) {
+            throw new IllegalStateException("No free guild numeric id (max 10000 guilds)");
+        }
+        guild.setNumericPublicId(free);
     }
 
     private static void loadPlayerGuildMemberships(MinecraftServer server) {
@@ -94,7 +203,7 @@ public class GuildDataManager {
             Files.createDirectories(dir);
             String shortId = guild.getId().toString().substring(0, 8);
             Path file = dir.resolve("guild_" + shortId + ".json");
-            try (FileWriter writer = new FileWriter(file.toFile());){
+            try (BufferedWriter writer = Files.newBufferedWriter(file, StandardCharsets.UTF_8, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.WRITE)) {
                 GSON.toJson((Object)guild, (Appendable)writer);
             }
             System.out.println("[GuildDataManager] Saved guild: " + guild.getName() + " as " + String.valueOf(file.getFileName()));
@@ -144,9 +253,46 @@ public class GuildDataManager {
     }
 
     public static Guild getGuildByShortId(String shortId) {
+        if (shortId == null) {
+            return null;
+        }
+        String t = shortId.trim();
+        if (t.isEmpty()) {
+            return null;
+        }
+        if (t.startsWith("guild_")) {
+            String rest = t.substring("guild_".length());
+            if (rest.matches("[0-9a-fA-F]{8}")) {
+                for (Guild guild : guilds.values()) {
+                    if (!guild.getId().toString().startsWith(rest)) continue;
+                    return guild;
+                }
+                return null;
+            }
+            if (rest.matches("\\d{4}")) {
+                return GuildDataManager.getGuildByNumericCode(rest);
+            }
+            return null;
+        }
+        if (t.matches("\\d{1,4}")) {
+            try {
+                int v = Integer.parseInt(t);
+                if (v >= 0 && v <= 9999) {
+                    return GuildDataManager.getGuildByNumericCode(String.format("%04d", v));
+                }
+            }
+            catch (NumberFormatException ignored) {
+                return null;
+            }
+        }
+        return null;
+    }
+
+    private static Guild getGuildByNumericCode(String fourDigits) {
         for (Guild guild : guilds.values()) {
-            String guildShortId = "guild_" + guild.getId().toString().substring(0, 8);
-            if (!guildShortId.equals(shortId)) continue;
+            int n = guild.getNumericPublicId();
+            if (n < 0 || n > 9999) continue;
+            if (!Guild.formatPublicId(n).equals(fourDigits)) continue;
             return guild;
         }
         return null;
@@ -173,7 +319,7 @@ public class GuildDataManager {
     }
 
     /**
-     * 解析指令中的公會識別：完整 UUID，或舊版 {@code guild_} 開頭的短 ID（與存檔 / 盟友鍵一致）。
+     * 解析指令中的公會識別：完整 UUID、四位數字編號（可省略前導零至 1 位）、或舊版 {@code guild_} 開頭的 8 位十六進制短 ID。
      */
     public static Guild getGuildByIdInput(String raw) {
         if (raw == null) {
@@ -191,10 +337,7 @@ public class GuildDataManager {
         }
         catch (IllegalArgumentException ignored) {
         }
-        if (t.startsWith("guild_")) {
-            return GuildDataManager.getGuildByShortId(t);
-        }
-        return null;
+        return GuildDataManager.getGuildByShortId(t);
     }
 
     public static void clearAllInvites() {
@@ -254,7 +397,7 @@ public class GuildDataManager {
         if (!Files.exists(path)) {
             return null;
         }
-        try (BufferedReader reader = Files.newBufferedReader(path)) {
+        try (BufferedReader reader = Files.newBufferedReader(path, StandardCharsets.UTF_8)) {
             return GSON.fromJson(reader, Guild.class);
         }
         catch (IOException e) {
@@ -292,6 +435,7 @@ public class GuildDataManager {
 
         public JsonElement serialize(Guild guild, Type typeOfSrc, JsonSerializationContext context) {
             JsonObject obj = new JsonObject();
+            obj.addProperty("uuid", guild.getId().toString());
             obj.addProperty("id", guild.getShortenedId());
             obj.addProperty("name", guild.getName());
             obj.addProperty("color", guild.getColor());
@@ -301,6 +445,7 @@ public class GuildDataManager {
             obj.addProperty("ownerId", guild.getOwnerId().toString());
             obj.addProperty("ownerName", guild.getOwnerName());
             obj.addProperty("friendlyFire", Boolean.valueOf(guild.isFriendlyFireEnabled()));
+            obj.addProperty("numericPublicId", (Number)guild.getNumericPublicId());
             if (guild.hasHome()) {
                 obj.addProperty("homeX", (Number)guild.getHomeX());
                 obj.addProperty("homeY", (Number)guild.getHomeY());
@@ -348,8 +493,7 @@ public class GuildDataManager {
 
         public Guild deserialize(JsonElement json, Type typeOfT, JsonDeserializationContext context) throws JsonParseException {
             JsonObject obj = json.getAsJsonObject();
-            String idStr = obj.get("id").getAsString();
-            UUID id = UUID.fromString(idStr.replace("guild_", "") + "-0000-0000-0000-000000000000");
+            UUID id = obj.has("uuid") ? UUID.fromString(obj.get("uuid").getAsString()) : UUID.fromString(obj.get("id").getAsString().replace("guild_", "") + "-0000-0000-0000-000000000000");
             String name = obj.get("name").getAsString();
             String color = obj.get("color").getAsString();
             Instant createdAt = (Instant)context.deserialize(obj.get("createdAt"), Instant.class);
@@ -357,6 +501,9 @@ public class GuildDataManager {
             String ownerName = obj.get("ownerName").getAsString();
             boolean friendlyFire = obj.get("friendlyFire").getAsBoolean();
             Guild guild = new Guild(id, name, color, createdAt, ownerId, ownerName, friendlyFire);
+            if (obj.has("numericPublicId")) {
+                guild.setNumericPublicId(obj.get("numericPublicId").getAsInt());
+            }
             if (obj.has("prefix")) {
                 guild.setPrefix(obj.get("prefix").getAsString());
             }

@@ -127,6 +127,7 @@ public class GuildCommand {
             Guild guild = new Guild(UUID.randomUUID(), name, color.getName(), Instant.now(), playerId, playerName, false);
             guild.addMember(playerId, playerName, "Guild Master");
             GuildDataManager.registerGuild(guild);
+            GuildDataManager.assignNumericIdForNewGuild(guild);
             GuildDataManager.saveGuild(source.getServer(), guild);
             String guildShortId = guild.getShortenedId();
             if (GuildsConfig.enableGuildBank) {
@@ -610,8 +611,7 @@ public class GuildCommand {
             guild.setColor(color.getName().toLowerCase());
             guild.setPrefix(newName);
             GuildDataManager.saveGuild(source.getServer(), guild);
-            UUID renamedGuildId = guild.getId();
-            String renamedShortId = "guild_" + renamedGuildId.toString().substring(0, 8);
+            String renamedShortId = guild.getShortenedId();
             MinecraftServer server = source.getServer();
             for (String allyShortId : guild.getAllies().keySet()) {
                 Map<String, Guild.AllyInfo> theirAllies;
@@ -737,9 +737,9 @@ public class GuildCommand {
                 source.sendError(GuildTexts.t("error.ally_self"));
                 return 0;
             }
-            String targetShortId = "guild_" + targetGuild.getId().toString().substring(0, 8);
+            String targetShortId = targetGuild.getShortenedId();
             if (senderGuild.getAllies().containsKey(targetShortId)) {
-                MutableText yesButton = GuildTexts.t("common.button_yes").setStyle(Style.EMPTY.withColor(Formatting.RED).withClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/guild allyrevoke " + targetGuild.getId())).withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, GuildTexts.t("ally.revoke_hover_yes"))));
+                MutableText yesButton = GuildTexts.t("common.button_yes").setStyle(Style.EMPTY.withColor(Formatting.RED).withClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/guild allyrevoke " + targetGuild.getShortenedId())).withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, GuildTexts.t("ally.revoke_hover_yes"))));
                 MutableText noButton = GuildTexts.t("common.button_no").setStyle(Style.EMPTY.withColor(Formatting.GREEN).withClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/guild cancel")).withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, GuildTexts.t("common.hover_cancel"))));
                 sender.sendMessage(GuildTexts.t("ally.already_allied_prefix").append(Text.literal(targetGuild.getName()).formatted(Formatting.YELLOW)).append(GuildTexts.t("ally.already_allied_suffix")).append(yesButton).append(Text.literal(" ")).append(noButton), false);
                 return 0;
@@ -751,23 +751,21 @@ public class GuildCommand {
             }
             GuildDataManager.addAllyRequest(targetGuild.getOwnerId(), senderGuild.getId());
             sender.sendMessage(GuildTexts.t("ally.request_sent", targetGuild.getName()).formatted(Formatting.GREEN), false);
-            MutableText acceptButton = GuildTexts.t("ally.button_accept").setStyle(Style.EMPTY.withColor(Formatting.GREEN).withClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/guild allyaccept " + String.valueOf(senderGuild.getId()))).withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, GuildTexts.t("ally.hover_accept"))));
-            MutableText denyButton = GuildTexts.t("ally.button_deny").setStyle(Style.EMPTY.withColor(Formatting.RED).withClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/guild allydeny " + String.valueOf(senderGuild.getId()))).withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, GuildTexts.t("ally.hover_deny"))));
+            MutableText acceptButton = GuildTexts.t("ally.button_accept").setStyle(Style.EMPTY.withColor(Formatting.GREEN).withClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/guild allyaccept " + senderGuild.getShortenedId())).withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, GuildTexts.t("ally.hover_accept"))));
+            MutableText denyButton = GuildTexts.t("ally.button_deny").setStyle(Style.EMPTY.withColor(Formatting.RED).withClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/guild allydeny " + senderGuild.getShortenedId())).withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, GuildTexts.t("ally.hover_deny"))));
             targetMaster.sendMessage(GuildTexts.t("ally.incoming_prefix").append(Text.literal(senderGuild.getName()).formatted(Formatting.YELLOW)).append(GuildTexts.t("ally.incoming_suffix")).append(acceptButton).append(Text.literal(" ")).append(denyButton), false);
             return 1;
         })))).then(CommandManager.literal((String)"allyaccept").then(CommandManager.argument((String)"guildId", (ArgumentType)StringArgumentType.word()).executes(ctx -> {
-            UUID requesterGuildId;
             ServerCommandSource source = (ServerCommandSource)ctx.getSource();
             ServerPlayerEntity player = source.getPlayer();
             MinecraftServer server = source.getServer();
             String guildIdStr = StringArgumentType.getString((CommandContext)ctx, (String)"guildId");
-            try {
-                requesterGuildId = UUID.fromString(guildIdStr);
-            }
-            catch (IllegalArgumentException e) {
+            Guild requesterGuild = GuildDataManager.getGuildByIdInput(guildIdStr);
+            if (requesterGuild == null) {
                 source.sendError(GuildTexts.t("error.invalid_guild_id"));
                 return 0;
             }
+            UUID requesterGuildId = requesterGuild.getId();
             Guild receiverGuild = GuildDataManager.getGuildByPlayer(player.getUuid());
             if (receiverGuild == null) {
                 source.sendError(GuildTexts.t("error.not_in_guild"));
@@ -782,13 +780,8 @@ public class GuildCommand {
                 source.sendError(GuildTexts.t("error.ally_no_pending"));
                 return 0;
             }
-            Guild requesterGuild = GuildDataManager.getGuildById(requesterGuildId);
-            if (requesterGuild == null) {
-                source.sendError(GuildTexts.t("error.ally_requester_gone"));
-                return 0;
-            }
-            receiverGuild.addAlly(requesterGuild.getId(), requesterGuild.getName());
-            requesterGuild.addAlly(receiverGuild.getId(), receiverGuild.getName());
+            receiverGuild.addAlly(requesterGuild, requesterGuild.getName());
+            requesterGuild.addAlly(receiverGuild, receiverGuild.getName());
             AllyChatBridgeManager.createBridge(receiverGuild.getShortenedId(), requesterGuild.getShortenedId());
             GuildDataManager.removeAllyRequest(player.getUuid());
             GuildDataManager.saveGuild(server, receiverGuild);
@@ -803,23 +796,26 @@ public class GuildCommand {
             UUID playerId = ((ServerCommandSource)ctx.getSource()).getPlayer().getUuid();
             UUID requesterId = GuildDataManager.getAllyRequest(playerId);
             if (requesterId != null) {
-                builder.suggest(requesterId.toString());
+                Guild rg = GuildDataManager.getGuildById(requesterId);
+                if (rg != null) {
+                    builder.suggest(rg.getShortenedId());
+                } else {
+                    builder.suggest(requesterId.toString());
+                }
             }
             return builder.buildFuture();
         }).executes(ctx -> {
-            UUID requesterGuildId;
             ServerCommandSource source = (ServerCommandSource)ctx.getSource();
             ServerPlayerEntity player = source.getPlayer();
             MinecraftServer server = source.getServer();
             UUID playerId = player.getUuid();
             String guildIdStr = StringArgumentType.getString((CommandContext)ctx, (String)"guildId");
-            try {
-                requesterGuildId = UUID.fromString(guildIdStr);
-            }
-            catch (IllegalArgumentException e) {
+            Guild senderGuild = GuildDataManager.getGuildByIdInput(guildIdStr);
+            if (senderGuild == null) {
                 source.sendError(GuildTexts.t("error.invalid_guild_id"));
                 return 0;
             }
+            UUID requesterGuildId = senderGuild.getId();
             Guild receiverGuild = GuildDataManager.getGuildByPlayer(playerId);
             if (receiverGuild == null) {
                 source.sendError(GuildTexts.t("error.not_in_guild"));
@@ -832,11 +828,6 @@ public class GuildCommand {
             UUID expected = GuildDataManager.getAllyRequest(playerId);
             if (!requesterGuildId.equals(expected)) {
                 source.sendError(GuildTexts.t("error.ally_deny_no_pending"));
-                return 0;
-            }
-            Guild senderGuild = GuildDataManager.getGuildById(requesterGuildId);
-            if (senderGuild == null) {
-                source.sendError(GuildTexts.t("error.ally_guild_missing"));
                 return 0;
             }
             GuildDataManager.removeAllyRequest(playerId);
@@ -855,7 +846,7 @@ public class GuildCommand {
                     String name = ally.getValue().name;
                     Guild g = GuildDataManager.getGuildByShortId(shortId);
                     if (g != null) {
-                        builder.suggest(g.getId().toString(), (Message)Text.literal(name));
+                        builder.suggest(g.getShortenedId(), (Message)Text.literal(name));
                     } else {
                         builder.suggest(shortId, (Message)Text.literal(name));
                     }
@@ -1178,8 +1169,7 @@ public class GuildCommand {
             GuildTeamUtil.clearTeamForPlayer(member, server);
             GuildTeamUtil.forceUpdateForPlayer(member);
         }
-        UUID disbandedId = guild.getId();
-        String disbandedShortId = "guild_" + disbandedId.toString().substring(0, 8);
+        String disbandedShortId = guild.getShortenedId();
         String disbandedName = guild.getName();
         for (String allyShortId : guild.getAllies().keySet()) {
             Map<String, Guild.AllyInfo> theirAllies;
@@ -1207,7 +1197,7 @@ public class GuildCommand {
     public static void displayGuildInfo(MinecraftServer server, ServerCommandSource source, Guild guild) {
         Formatting guildColor = GuildColorUtil.getFormatting(guild.getColor());
         source.sendMessage(GuildTexts.t("info.guild_label").append(Text.literal(guild.getName()).formatted(guildColor)));
-        source.sendMessage(GuildTexts.t("info.guild_id_label").append(Text.literal(guild.getId().toString()).formatted(Formatting.GRAY)));
+        source.sendMessage(GuildTexts.t("info.guild_id_label").append(Text.literal(guild.getShortenedId()).formatted(Formatting.GRAY)));
         if (guild.getMotd() != null && !guild.getMotd().isEmpty()) {
             source.sendMessage(GuildTexts.t("info.motd_label").append(Text.literal(guild.getMotd()).styled(style -> style.withColor(guildColor).withItalic(Boolean.valueOf(true)))));
         }
