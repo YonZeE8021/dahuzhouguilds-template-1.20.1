@@ -19,8 +19,8 @@ public class Guild {
     private String name;
     private String color;
     private final Instant createdAt;
-    private final UUID ownerId;
-    private final String ownerName;
+    private UUID ownerId;
+    private String ownerName;
     private final boolean friendlyFire;
     private String prefix;
     private final Relationships relationships = new Relationships();
@@ -142,6 +142,11 @@ public class Guild {
 
     public String getOwnerName() {
         return this.ownerName;
+    }
+
+    public void setOwner(UUID newOwnerId, String newOwnerName) {
+        this.ownerId = newOwnerId;
+        this.ownerName = newOwnerName;
     }
 
     public boolean isFriendlyFireEnabled() {

@@ -1116,6 +1116,81 @@ public class GuildCommand {
             guild.setUnlockedBankTabs(nextTab);
             source.sendFeedback(() -> GuildTexts.t("unlock.success", nextTab), false);
             return 1;
+        }))).then(CommandManager.literal((String)"transfer").requires(source -> !GuildsConfig.requireOpToTransferGuild || source.hasPermissionLevel(2)).then(CommandManager.argument((String)"player", (ArgumentType)StringArgumentType.word()).suggests((ctx, builder) -> {
+            ServerPlayerEntity executor = ((ServerCommandSource)ctx.getSource()).getPlayer();
+            Guild guild = GuildDataManager.getGuildByPlayer(executor.getUuid());
+            if (guild != null && guild.getOwnerId().equals(executor.getUuid())) {
+                for (Map.Entry<UUID, Guild.GuildMemberInfo> entry : guild.getMembers().entrySet()) {
+                    UUID memberId = entry.getKey();
+                    Guild.GuildMemberInfo info = entry.getValue();
+                    if (memberId.equals(executor.getUuid())) continue;
+                    builder.suggest(info.name);
+                }
+            }
+            return builder.buildFuture();
+        }).executes(ctx -> {
+            ServerCommandSource source = (ServerCommandSource)ctx.getSource();
+            ServerPlayerEntity executor = source.getPlayer();
+            MinecraftServer server = source.getServer();
+            UUID executorId = executor.getUuid();
+            String targetName = StringArgumentType.getString((CommandContext)ctx, (String)"player");
+            Guild guild = GuildDataManager.getGuildByPlayer(executorId);
+            if (guild == null) {
+                source.sendError(GuildTexts.t("error.not_in_guild"));
+                return 0;
+            }
+            if (!guild.getOwnerId().equals(executorId)) {
+                source.sendError(GuildTexts.t("error.transfer_only_owner"));
+                return 0;
+            }
+            UUID targetId = null;
+            Guild.GuildMemberInfo targetInfo = null;
+            for (Map.Entry<UUID, Guild.GuildMemberInfo> entry : guild.getMembers().entrySet()) {
+                if (!entry.getValue().name.equalsIgnoreCase(targetName)) continue;
+                targetId = entry.getKey();
+                targetInfo = entry.getValue();
+                break;
+            }
+            if (targetId == null || targetId.equals(executorId)) {
+                source.sendError(GuildTexts.t("error.transfer_invalid_target"));
+                return 0;
+            }
+            Guild.GuildMemberInfo oldMasterMember = guild.getMembers().get(executorId);
+            if (oldMasterMember != null) {
+                oldMasterMember.rank = "Officer";
+            }
+            targetInfo.rank = "Guild Master";
+            guild.setOwner(targetId, targetInfo.name);
+            GuildDataManager.saveGuild(server, guild);
+            String executorName = executor.getName().getString();
+            String guildName = guild.getName();
+            final String newMasterName = targetInfo.name;
+            source.sendFeedback(() -> GuildTexts.t("transfer.success_executor", newMasterName), false);
+            ServerPlayerEntity newMasterPlayer = server.getPlayerManager().getPlayer(targetId);
+            if (newMasterPlayer != null) {
+                newMasterPlayer.sendMessage(GuildTexts.t("transfer.success_target", guildName).formatted(Formatting.GOLD), false);
+                if (GuildsConfig.enableEssentialsCommandGuildPrefix) {
+                    GuildPrefixHelper.applyGuildPrefix(newMasterPlayer);
+                }
+                if (GuildsConfig.enableHungerBoundIntegration) {
+                    GuildHungerBoundPrefixHelper.applyGuildHungerBoundPrefix(newMasterPlayer);
+                }
+                GuildTeamUtil.forceUpdateForPlayer(newMasterPlayer);
+            }
+            if (GuildsConfig.enableEssentialsCommandGuildPrefix) {
+                GuildPrefixHelper.applyGuildPrefix(executor);
+            }
+            if (GuildsConfig.enableHungerBoundIntegration) {
+                GuildHungerBoundPrefixHelper.applyGuildHungerBoundPrefix(executor);
+            }
+            GuildTeamUtil.forceUpdateForPlayer(executor);
+            for (UUID memberId : guild.getMembers().keySet()) {
+                if (memberId.equals(executorId) || memberId.equals(targetId)) continue;
+                ServerPlayerEntity member = server.getPlayerManager().getPlayer(memberId);
+                if (member == null) continue;
+                member.sendMessage(GuildTexts.t("transfer.broadcast", executorName, guildName, newMasterName).formatted(Formatting.GRAY), false);
+            }
+            return 1;
         }))).then(CommandManager.literal((String)"cancel").executes(ctx -> {
             ((ServerCommandSource)ctx.getSource()).getPlayer().sendMessage(GuildTexts.t("common.action_cancelled").formatted(Formatting.GRAY));
             return 1;
